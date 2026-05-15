@@ -1,0 +1,11 @@
+cve_id,title,cvss_score,severity,asset,patch_available,exploit_available,published_date,assigned_to,status
+CVE-2024-1234,"Remote Code Execution in OpenSSH",9.8,Critical,web-server-01,true,true,2024-03-15,SecOps Team,Open
+CVE-2024-5678,"Privilege Escalation in sudo",7.8,High,linux-host-04,true,false,2024-04-01,Bob Martinez,Open
+CVE-2024-9012,"Reflected XSS in Customer Portal",5.4,Medium,customer-portal,true,false,2024-04-20,Eva Wilson,In Progress
+CVE-2024-3456,"Information Disclosure in REST API",3.1,Low,api-gateway,false,false,2024-05-01,Unassigned,Open
+CVE-2024-7890,"SQL Injection in Login Form",9.1,Critical,auth-service,true,true,2024-03-28,Alice Chen,Open
+CVE-2024-2345,"Insecure Deserialization in Java App",8.8,High,app-server-03,true,true,2024-04-10,David Lee,In Progress
+CVE-2024-6789,"Directory Traversal in File Upload",6.5,Medium,file-server-02,true,false,2024-04-25,Carol Smith,Open
+CVE-2024-1122,"Weak TLS Configuration",4.3,Medium,load-balancer,false,false,2024-05-05,Network Team,Open
+CVE-2024-8800,"Buffer Overflow in PDF Parser",7.2,High,workstation-batch,true,false,2024-04-18,Frank Zhang,Open
+CVE-2024-4400,"CSRF in Admin Dashboard",5.9,Medium,admin-portal,true,false,2024-04-30,Henry Park,Open

@@ -1,0 +1,91 @@
+<?xml version="1.0" ?>
+<NessusClientData_v2>
+  <Report name="Acme Financial Corp — Internal Scan" xmlns:cm="http://www.nessus.org/cm">
+    <ReportHost name="10.0.1.100">
+      <HostProperties>
+        <tag name="host-ip">10.0.1.100</tag>
+        <tag name="hostname">core-banking-01</tag>
+        <tag name="operating-system">Linux 5.15</tag>
+      </HostProperties>
+      <ReportItem port="443" svc_name="https" protocol="tcp" severity="4" pluginID="10001" pluginName="Apache Log4Shell RCE (Log4j)" pluginFamily="Web Servers" cvss3_base_score="10.0" cvss_base_score="10.0">
+        <solution>Upgrade Apache Log4j to version 2.17.1 or later.</solution>
+        <description>A critical remote code execution vulnerability exists in Apache Log4j 2.x before 2.15.0 via JNDI lookup. An attacker can exploit this to execute arbitrary code on the server.</description>
+        <cve>CVE-2021-44228</cve>
+        <cvss3_vector>CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H</cvss3_vector>
+        <vuln_publication_date>2021-12-10</vuln_publication_date>
+        <exploit_available>true</exploit_available>
+        <patch_available>true</patch_available>
+        <plugin_output>Log4j version 2.14.1 detected. JNDI lookups enabled.</plugin_output>
+      </ReportItem>
+      <ReportItem port="22" svc_name="ssh" protocol="tcp" severity="3" pluginID="10002" pluginName="OpenSSH Authentication Bypass" pluginFamily="SSH" cvss3_base_score="7.5" cvss_base_score="7.5">
+        <solution>Update OpenSSH to version 9.6 or later.</solution>
+        <description>A vulnerability in OpenSSH allows attackers to bypass authentication under specific configuration conditions using malformed packets.</description>
+        <cve>CVE-2023-51385</cve>
+        <cvss3_vector>CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N</cvss3_vector>
+        <vuln_publication_date>2023-12-20</vuln_publication_date>
+        <exploit_available>false</exploit_available>
+        <patch_available>true</patch_available>
+        <plugin_output>OpenSSH 8.9p1 detected on port 22.</plugin_output>
+      </ReportItem>
+      <ReportItem port="3306" svc_name="mysql" protocol="tcp" severity="2" pluginID="10003" pluginName="MySQL Privilege Escalation via UDF" pluginFamily="Databases" cvss3_base_score="6.7" cvss_base_score="6.5">
+        <solution>Revoke FILE privilege from non-admin MySQL users and disable UDF loading.</solution>
+        <description>MySQL allows low-privileged users with FILE privilege to escalate to root by loading a malicious User Defined Function (UDF) shared library.</description>
+        <cve>CVE-2023-21980</cve>
+        <cvss3_vector>CVSS:3.1/AV:L/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:N</cvss3_vector>
+        <vuln_publication_date>2023-04-18</vuln_publication_date>
+        <exploit_available>false</exploit_available>
+        <patch_available>true</patch_available>
+      </ReportItem>
+    </ReportHost>
+    <ReportHost name="10.0.2.50">
+      <HostProperties>
+        <tag name="host-ip">10.0.2.50</tag>
+        <tag name="hostname">customer-portal</tag>
+        <tag name="operating-system">Ubuntu 22.04</tag>
+      </HostProperties>
+      <ReportItem port="443" svc_name="https" protocol="tcp" severity="4" pluginID="10004" pluginName="Spring4Shell Remote Code Execution" pluginFamily="Web Servers" cvss3_base_score="9.8" cvss_base_score="9.8">
+        <solution>Upgrade Spring Framework to 5.3.18+ or 5.2.20+, or apply vendor patches.</solution>
+        <description>A critical RCE vulnerability in Spring MVC (Spring4Shell) allows unauthenticated attackers to execute arbitrary code via crafted HTTP requests exploiting ClassLoader manipulation.</description>
+        <cve>CVE-2022-22965</cve>
+        <cvss3_vector>CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H</cvss3_vector>
+        <vuln_publication_date>2022-03-31</vuln_publication_date>
+        <exploit_available>true</exploit_available>
+        <patch_available>true</patch_available>
+      </ReportItem>
+      <ReportItem port="80" svc_name="http" protocol="tcp" severity="2" pluginID="10005" pluginName="Nginx HTTP Request Smuggling" pluginFamily="Web Servers" cvss3_base_score="5.9" cvss_base_score="5.8">
+        <solution>Upgrade Nginx to version 1.25.3 or later.</solution>
+        <description>Nginx versions before 1.25.3 are vulnerable to HTTP request smuggling when used as a reverse proxy, potentially allowing cache poisoning or request forgery.</description>
+        <cve>CVE-2023-44487</cve>
+        <cvss3_vector>CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:N/I:L/A:L</cvss3_vector>
+        <vuln_publication_date>2023-10-10</vuln_publication_date>
+        <exploit_available>false</exploit_available>
+        <patch_available>true</patch_available>
+      </ReportItem>
+      <ReportItem port="443" svc_name="https" protocol="tcp" severity="1" pluginID="10006" pluginName="TLS 1.0 Protocol Enabled" pluginFamily="General" cvss3_base_score="3.7" cvss_base_score="4.3">
+        <solution>Disable TLS 1.0 and 1.1. Enable only TLS 1.2 and TLS 1.3.</solution>
+        <description>The remote host supports TLS 1.0 which is deprecated and susceptible to POODLE and BEAST attacks.</description>
+        <cve>CVE-2011-3389</cve>
+        <cvss3_vector>CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N</cvss3_vector>
+        <vuln_publication_date>2011-09-06</vuln_publication_date>
+        <exploit_available>false</exploit_available>
+        <patch_available>false</patch_available>
+      </ReportItem>
+    </ReportHost>
+    <ReportHost name="172.16.10.1">
+      <HostProperties>
+        <tag name="host-ip">172.16.10.1</tag>
+        <tag name="hostname">atm-controller</tag>
+        <tag name="operating-system">Windows Server 2016</tag>
+      </HostProperties>
+      <ReportItem port="445" svc_name="smb" protocol="tcp" severity="4" pluginID="10007" pluginName="EternalBlue SMB Remote Code Execution (MS17-010)" pluginFamily="Windows" cvss3_base_score="9.8" cvss_base_score="10.0">
+        <solution>Apply Microsoft security update MS17-010 immediately.</solution>
+        <description>The remote Windows host is missing the MS17-010 patch and is vulnerable to the EternalBlue exploit used by WannaCry and NotPetya ransomware campaigns.</description>
+        <cve>CVE-2017-0144</cve>
+        <cvss3_vector>CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H</cvss3_vector>
+        <vuln_publication_date>2017-03-14</vuln_publication_date>
+        <exploit_available>true</exploit_available>
+        <patch_available>true</patch_available>
+      </ReportItem>
+    </ReportHost>
+  </Report>
+</NessusClientData_v2>
