@@ -7,13 +7,15 @@ import type { IOC } from '../lib/types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-const FEEDS_URL = `${SUPABASE_URL}/functions/v1/threat-feeds`;
+//const FEEDS_URL = `${SUPABASE_URL}/functions/v1/threat-feeds`;
+const FEEDS_URL = 'http://localhost:3001/threat-feeds';
 
 const LIVE_POLL_INTERVAL = 60_000; // re-fetch every 60s when live feed panel is open
 
 const CATEGORIES = ['All', 'APT', 'Ransomware', 'Malware', 'Phishing', 'Botnet', 'RAT', 'Loader', 'DDoS', 'Insider', 'Supply Chain'];
 const STATUSES = ['All', 'Active', 'Investigating', 'Mitigated', 'Closed'];
 const SOURCES = ['All', 'Live Feed', 'Manual'];
+
 
 interface LiveThreat {
   id: string;
@@ -358,8 +360,29 @@ export default function Threats() {
     setAddIOCOpen(false);
     showToast(`IOC "${ioc.value}" added to threat intelligence`);
   };
-
+  
   const fetchLiveFeeds = useCallback(async (force = false) => {
+  if (!force && lastFetched && Date.now() - lastFetched.getTime() < 5 * 60 * 1000) return;
+  setLoading(true);
+  setFetchError(null);
+  try {
+    const res = await fetch(FEEDS_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data)) {
+      setLiveThreats(json.data);
+      setLastFetched(new Date());
+    } else {
+      throw new Error(json.error ?? 'Unknown error');
+    }
+  } catch (err) {
+    setFetchError((err as Error).message);
+  } finally {
+    setLoading(false);
+  }
+}, [lastFetched]);
+
+  /*const fetchLiveFeeds = useCallback(async (force = false) => {
     if (!force && lastFetched && Date.now() - lastFetched.getTime() < 5 * 60 * 1000) return;
     setLoading(true);
     setFetchError(null);
@@ -380,7 +403,7 @@ export default function Threats() {
     } finally {
       setLoading(false);
     }
-  }, [lastFetched]);
+  }, [lastFetched]);*/
 
   // Initial load
   useEffect(() => { fetchLiveFeeds(); }, []);

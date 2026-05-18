@@ -7,6 +7,7 @@ import {
   mockKPIs, mockOrg, mockRisks, mockComplianceFrameworks, mockIncidents,
   mockVulnerabilities, mockAssets, mockRegulatoryMetrics, mockMonteCarloResults,
 } from '../lib/mockData';
+import { pdfGenerators } from '../lib/pdfExport';
 
 const fmt$ = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M`
@@ -92,7 +93,7 @@ const categoryColors: Record<string, string> = {
 
 // ── CSV generators ──────────────────────────────────────────────────────────
 
-function generateFAIRCsv() {
+/*function generateFAIRCsv() {
   const headers = ['Risk ID', 'Title', 'Category', 'Status', 'Treatment', 'TEF (Likely)', 'Vulnerability %', 'LEF', 'Loss Magnitude (Likely)', 'ALE', 'ALE Min', 'ALE Max', 'Treatment Cost', 'ROI %', 'Framework Tags'];
   const rows = mockRisks.map(r => [
     r.id, `"${r.title}"`, r.category, r.status, r.treatment,
@@ -249,7 +250,7 @@ const csvGenerators: Record<ReportId, () => string> = {
   dora:       generateDoraCsv,
   vuln:       generateVulnCsv,
   incident:   generateIncidentCsv,
-};
+};*/
 
 export default function Reports() {
   const [generating, setGenerating] = useState<ReportId | null>(null);
@@ -268,7 +269,16 @@ export default function Reports() {
   const doraIncidents    = mockIncidents.filter(i => i.is_dora_reportable);
   const doraReported     = doraIncidents.filter(i => i.dora_reported).length;
 
-  const handleGenerate = async (id: ReportId, title: string) => {
+const handleGenerate = async (id: ReportId, title: string) => {
+  setGenerating(id);
+  await new Promise(r => setTimeout(r, 800));
+  pdfGenerators[id]?.();           // ← generates + auto-downloads PDF
+  setGenerating(null);
+  setToast(`"${title}" exported as PDF`);
+  setTimeout(() => setToast(null), 4000);
+};
+
+/*  const handleGenerate = async (id: ReportId, title: string) => {
     setGenerating(id);
     await new Promise(r => setTimeout(r, 800)); // simulate generation
     const csv = csvGenerators[id]();
@@ -276,7 +286,7 @@ export default function Reports() {
     setGenerating(null);
     setToast(`"${title}" exported successfully`);
     setTimeout(() => setToast(null), 4000);
-  };
+  };*/
 
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-screen-2xl">
