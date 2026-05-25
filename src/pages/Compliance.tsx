@@ -5,11 +5,13 @@ import {
 } from 'lucide-react';
 import type { ComplianceFramework, ComplianceAssessment } from '../lib/complianceTypes';
 import type { RunAssessmentForm } from '../lib/complianceTypes';
+import { generateComplianceReport } from '../lib/certificateExport';
 import {
-  fetchFrameworks, fetchAssessments, fetchControls, createAssessment,
+  fetchFrameworks, fetchAssessments, fetchControls, createAssessment,fetchResults,
 } from '../lib/complianceData';
 import RunAssessmentModal from '../components/RunAssessmentModal';
 import AssessmentReviewPanel from '../components/AssessmentReviewPanel';
+import CertificateRegistry from '../components/CertificateRegistry';
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 
@@ -150,12 +152,37 @@ export default function Compliance() {
     });
   };
 
-  const handleAssessmentComplete = async (score: number) => {
+  /*const handleAssessmentComplete = async (score: number) => {
     setActiveAssessment(null);
     showToast(`Assessment completed! Overall score: ${score}%`);
     await loadFrameworks();
     if (selectedFwId) loadAssessments(selectedFwId);
-  };
+  };*/
+  
+  const handleAssessmentComplete = async (score: number) => {
+	  setActiveAssessmentId(null);   // close the panel
+
+	  // Fetch everything needed for the PDF
+	  try {
+		const [frameworks, allAssessments] = await Promise.all([
+		  fetchFrameworks(),
+		  fetchAllAssessments(),
+		]);
+
+		const fw = frameworks.find(f => f.id === selectedFrameworkId);
+		const as = allAssessments.find(a => a.overall_score === score);  // most recent
+
+		if (fw && as) {
+		  const results = await fetchResults(as.id);
+		  await generateComplianceReport(fw, as, results);
+		}
+	  } catch (e) {
+		console.error('PDF generation failed:', e);
+	  }
+
+	  // Refresh the page data as normal
+	  loadFrameworks();
+	};
 
   const selectedFw = frameworks.find(f => f.id === selectedFwId);
   const avgScore   = frameworks.length > 0

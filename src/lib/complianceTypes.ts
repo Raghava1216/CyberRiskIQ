@@ -11,7 +11,7 @@ export interface ComplianceFramework {
 }
 
 // Matches the existing compliance_controls DB table schema
-export interface ComplianceControl {
+/*export interface ComplianceControl {
   id: string;
   framework_id: string;
   framework_name: string;
@@ -24,6 +24,24 @@ export interface ComplianceControl {
   owner: string;
   notes: string;
   guidance: string;
+  sort_order: number;
+  due_date: string | null;
+}*/
+
+export interface ComplianceControl {
+  id: string;
+  framework_id: string;
+  framework_name: string;
+  control_id: string;
+  title: string;
+  domain: string;
+  status: string;
+  score: number;
+  evidence: string;
+  owner: string;
+  notes: string;
+  guidance: string;
+  question: string | null;   // ← new
   sort_order: number;
   due_date: string | null;
 }
