@@ -32,10 +32,10 @@ interface AIState {
 const STATUS_OPTIONS: {
   value: ControlResultStatus; label: string; color: string; icon: React.ReactNode;
 }[] = [
-  { value: 'compliant',      label: 'Compliant',     color: 'border-emerald-500/60 bg-emerald-500/10 text-emerald-400', icon: <CheckCircle size={14} /> },
-  { value: 'partial',        label: 'Partial',        color: 'border-amber-500/60 bg-amber-500/10 text-amber-400',       icon: <MinusCircle size={14} /> },
-  { value: 'noncompliant',   label: 'Non-Compliant',  color: 'border-red-500/60 bg-red-500/10 text-red-400',             icon: <XCircle size={14} /> },
-  { value: 'not_applicable', label: 'N/A',            color: 'border-slate-600 bg-slate-700/40 text-slate-400',          icon: <Ban size={14} /> },
+  { value: 'compliant',      label: 'Compliant',    color: 'border-emerald-500/60 bg-emerald-500/10 text-emerald-400', icon: <CheckCircle size={14} /> },
+  { value: 'partial',        label: 'Partial',       color: 'border-amber-500/60 bg-amber-500/10 text-amber-400',       icon: <MinusCircle size={14} /> },
+  { value: 'noncompliant',   label: 'Non-Compliant', color: 'border-red-500/60 bg-red-500/10 text-red-400',             icon: <XCircle size={14} /> },
+  { value: 'not_applicable', label: 'N/A',           color: 'border-slate-600 bg-slate-700/40 text-slate-400',          icon: <Ban size={14} /> },
 ];
 
 const RISK_PILL: Record<string, string> = {
@@ -57,9 +57,7 @@ function statusBadge(s: ControlResultStatus) {
   return 'bg-slate-700/20 text-slate-600 border-slate-700';
 }
 
-// ── AI prompt ─────────────────────────────────────────────────────────────────
-
-// ── AI prompt builder — exported so it can be tested independently ────────────
+// ── AI prompt builder — real market-based evaluation ─────────────────────────
 
 export function buildAIPrompt(
   framework: string,
@@ -73,62 +71,116 @@ export function buildAIPrompt(
     || guidance?.trim()
     || 'Is this control fully implemented, documented, and operating effectively?';
 
-  return `You are a senior GRC auditor conducting a compliance assessment for ${framework}.
+  return `You are a senior GRC auditor with 15+ years of experience conducting ${framework} compliance assessments for financial services enterprises.
 
-Control ID: ${controlId}
-Title: "${title}"
-Domain: ${domain}
+You are evaluating control "${controlId}: ${title}" in domain "${domain}".
+
 Assessment question: ${assessmentQuestion}
 
-Assess this control against a typical enterprise environment. Respond ONLY with valid JSON — no markdown, no explanation outside the object:
+## Your task
+Evaluate this control based on REAL-WORLD industry data and current market maturity levels for ${framework} compliance in enterprise financial services organizations. Base your assessment on:
+- How this specific control type typically performs across the industry
+- Known gaps and challenges organizations face with this control
+- Current threat landscape relevance
+- Regulatory enforcement history for this control area
+- Typical implementation maturity in 2024–2025
+
+## Scoring guidance (use the FULL range — do not cluster)
+- 90–100: Fully implemented, tested, documented, with evidence. Rare — only for foundational controls most orgs nail.
+- 75–89: Largely compliant with minor gaps. Common for well-understood controls.
+- 50–74: Partially implemented — policy exists but gaps in execution, testing, or coverage.
+- 25–49: Significant gaps — exists on paper but inadequate implementation.
+- 5–24: Non-existent or severely deficient. Common for emerging/complex controls.
+
+## N/A guidance
+Mark as not_applicable ONLY if this control genuinely does not apply to a typical financial services enterprise (e.g. a healthcare-specific control in a banking assessment). Most controls DO apply — use not_applicable sparingly.
+
+## Status mapping
+- compliant: score 80–100
+- partial: score 35–79
+- noncompliant: score 5–34
+- not_applicable: only if truly irrelevant
+
+Respond ONLY with a single valid JSON object — no markdown fences, no explanation, no text outside the JSON:
 
 {
-  "status": "compliant" | "partial" | "noncompliant",
-  "score": <integer 0–100>,
+  "status": "compliant" | "partial" | "noncompliant" | "not_applicable",
+  "score": <integer 5–100, reflecting genuine market maturity — NOT 70 by default>,
   "risk_level": "none" | "low" | "medium" | "high" | "critical",
-  "finding": "<2–3 sentence factual finding describing what was observed>",
-  "remediation": "<2–3 sentence specific actionable remediation with tools or timeframes>",
-  "due_date": "<ISO date 30–90 days from today if partial or noncompliant, else null>"
+  "finding": "<2–3 sentences grounded in real-world observations specific to ${title} — mention actual evidence types, tools, or gaps typically seen>",
+  "remediation": "<2–3 sentences of specific, actionable steps for ${title} — name actual tools, standards, or timeframes>",
+  "due_date": "<ISO 8601 date 30–90 days from today proportional to severity, or null if compliant>"
 }
 
-Scoring rules:
-- 85–100 → compliant · 50–84 → partial · 0–49 → noncompliant
-- risk_level: none or low for compliant; medium for partial; high or critical for noncompliant
-- finding: realistic enterprise observation referencing specific evidence types
-- remediation: concrete steps referencing specific tools or standards`;
+Critical rules:
+- Score must reflect THIS control's real-world maturity, not a default value
+- finding and remediation must be specific to "${title}", not boilerplate
+- risk_level must align with score: none/low for compliant, medium for partial, high/critical for noncompliant
+- Vary scores meaningfully: some controls score 92, others 18, others 61 — based on reality
+- Do NOT output scores like 67, 68, 70, 72 repeatedly — each control has its own realistic score`;
 }
 
-/*function buildAIPrompt(
-  framework: string,
-  controlId: string,
-  title: string,
-  domain: string,
-  guidance: string,
-): string {
-  return `You are a senior GRC auditor conducting a compliance assessment for ${framework}.
+// ── Groq API call ─────────────────────────────────────────────────────────────
 
-Control ID: ${controlId}
-Title: "${title}"
-Domain: ${domain}
-Assessor guidance: ${guidance || 'No additional guidance provided.'}
+async function callGroq(prompt: string): Promise<{
+  status: ControlResultStatus;
+  score: number;
+  risk_level: string;
+  finding: string;
+  remediation: string;
+  due_date: string | null;
+}> {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!apiKey) throw new Error('VITE_GROQ_API_KEY is not set in your .env file');
 
-Assess this control against a typical enterprise environment. Respond ONLY with valid JSON — no markdown, no explanation outside the object:
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a senior GRC auditor. You always respond with a single valid JSON object only — no markdown, no preamble, no explanation outside the JSON. Your assessments are grounded in real-world industry data and vary meaningfully per control.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 1000,
+    }),
+  });
 
-{
-  "status": "compliant" | "partial" | "noncompliant",
-  "score": <integer 0–100>,
-  "risk_level": "none" | "low" | "medium" | "high" | "critical",
-  "finding": "<2–3 sentence factual finding describing what was observed>",
-  "remediation": "<2–3 sentence specific actionable remediation with tools/timeframes>",
-  "due_date": "<ISO date 30–90 days from today if partial or noncompliant, else null>"
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Groq API ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content ?? '';
+  if (!text) throw new Error('Empty response from Groq');
+
+  // Strip markdown fences if model adds them despite instructions
+  const clean = text
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+  try {
+    return JSON.parse(clean);
+  } catch {
+    // Try to extract JSON object from response if there's surrounding text
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error('Could not parse JSON from Groq response');
+  }
 }
-
-Scoring rules:
-- 85–100 → compliant · 50–84 → partial · 0–49 → noncompliant
-- risk_level: none/low for compliant; medium for partial; high/critical for noncompliant
-- finding: realistic enterprise observation, reference specific evidence types
-- remediation: concrete steps, reference specific tools or standards`;
-}*/
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -142,16 +194,13 @@ export default function AssessmentReviewPanel({
   const [completing, setCompleting] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
 
-  // Per-control form state
   const [status,   setStatus]   = useState<ControlResultStatus>('not_reviewed');
   const [score,    setScore]    = useState<string>('');
   const [evidence, setEvidence] = useState('');
   const [notes,    setNotes]    = useState('');
 
-  // AI state keyed by result row id
   const [aiStates, setAiStates] = useState<Record<string, AIState>>({});
 
-  // Bulk run state
   const [bulkRunning,  setBulkRunning]  = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
   const [bulkTotal,    setBulkTotal]    = useState(0);
@@ -185,7 +234,6 @@ export default function AssessmentReviewPanel({
 
   useEffect(() => { loadResults(); }, [loadResults]);
 
-  // Populate form when navigating between controls
   useEffect(() => {
     const r = results[currentIdx];
     if (!r) return;
@@ -200,16 +248,13 @@ export default function AssessmentReviewPanel({
   const runAIForRow = useCallback(async (row: AssessmentResult): Promise<void> => {
     const ctrl = row.control;
 
-    // Guard: control didn't join
     if (!ctrl) {
       setAiStates(prev => ({
         ...prev,
         [row.id]: {
-          phase:       'error',
-          error:       `Control data missing for result ${row.id}. Check fetchResults join.`,
-          finding:     '',
-          remediation: '',
-          risk_level:  '',
+          phase: 'error',
+          error: `Control data missing for result ${row.id}.`,
+          finding: '', remediation: '', risk_level: '',
         },
       }));
       return;
@@ -221,49 +266,17 @@ export default function AssessmentReviewPanel({
     }));
 
     try {
-      const res = await fetch('/api/anthropic/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model:      'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages:   [{
-            role:    'user',
-            content: buildAIPrompt(
-				frameworkName,
-				ctrl.control_id ?? ctrl.id,
-				ctrl.title      ?? '—',
-				ctrl.domain     ?? '—',
-				ctrl.question   ?? null,
-				ctrl.guidance   ?? ctrl.notes ?? null,
-    		),
-          }],
-        }),
-      });
+      const prompt = buildAIPrompt(
+        frameworkName,
+        ctrl.control_id ?? ctrl.id,
+        ctrl.title      ?? '—',
+        ctrl.domain     ?? '—',
+        ctrl.question   ?? null,
+        ctrl.guidance   ?? ctrl.notes ?? null,
+      );
 
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`API ${res.status}: ${body.slice(0, 200)}`);
-      }
+      const parsed = await callGroq(prompt);
 
-      const data = await res.json();
-
-      const textBlock = (data.content as { type: string; text?: string }[])
-        ?.find(b => b.type === 'text');
-      if (!textBlock?.text) throw new Error('No text block in API response');
-
-      const parsed = JSON.parse(
-        textBlock.text.replace(/```json|```/g, '').trim()
-      ) as {
-        status:      ControlResultStatus;
-        score:       number;
-        risk_level:  string;
-        finding:     string;
-        remediation: string;
-        due_date:    string | null;
-      };
-
-      // Persist to Supabase
       await updateResult(row.id, {
         status:      parsed.status,
         score:       parsed.score,
@@ -272,7 +285,6 @@ export default function AssessmentReviewPanel({
         reviewed_by: assessedBy,
       });
 
-      // Update local results
       setResults(prev => prev.map(r =>
         r.id === row.id
           ? { ...r, status: parsed.status, score: parsed.score, notes: parsed.finding, evidence: parsed.remediation }
@@ -290,7 +302,6 @@ export default function AssessmentReviewPanel({
         },
       }));
 
-      // If this control is currently on screen, sync form fields
       setCurrentIdx(idx => {
         if (results[idx]?.id === row.id) {
           setStatus(parsed.status);
@@ -305,23 +316,20 @@ export default function AssessmentReviewPanel({
       setAiStates(prev => ({
         ...prev,
         [row.id]: {
-          phase:       'error',
-          error:       (err as Error).message,
-          finding:     '',
-          remediation: '',
-          risk_level:  '',
+          phase: 'error',
+          error: (err as Error).message,
+          finding: '', remediation: '', risk_level: '',
         },
       }));
     }
   }, [frameworkName, assessedBy, results]);
 
-  // Evaluate current control only
   const evaluateCurrent = () => {
     const row = results[currentIdx];
     if (row) runAIForRow(row);
   };
 
-  // ── AI: bulk run all controls ──────────────────────────────────────────────
+  // ── AI: bulk run with delay ────────────────────────────────────────────────
 
   const runBulkAI = useCallback(async () => {
     if (bulkRunning) return;
@@ -334,6 +342,10 @@ export default function AssessmentReviewPanel({
       if (abortRef.current) break;
       await runAIForRow(results[i]);
       setBulkProgress(i + 1);
+      // 2s delay between calls to stay within Groq rate limits
+      if (i < results.length - 1 && !abortRef.current) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
     }
 
     setBulkRunning(false);
@@ -493,6 +505,10 @@ export default function AssessmentReviewPanel({
               </>
             )}
           </div>
+
+          <p className="text-slate-600 text-xs flex items-center gap-1">
+            <Sparkles size={9} /> Powered by Groq · Llama 3.3 70B · Market-based evaluation
+          </p>
         </div>
 
         {/* Body */}
@@ -552,43 +568,19 @@ export default function AssessmentReviewPanel({
                   </span>
                 </div>
                 <h3 className="text-slate-100 font-semibold text-sm leading-snug">
-                  {ctrl?.title ?? ctrl?.name ?? '—'}
+                  {ctrl?.title ?? '—'}
                 </h3>
-                /*{(ctrl?.guidance ?? ctrl?.notes) && (
-                  <p className="text-slate-500 text-xs mt-2 leading-relaxed">
-                    {ctrl?.guidance ?? ctrl?.notes}
-                  </p>
-                )}*/
-				{/* Assessment question — shown to assessor during review */}
-				{(ctrl?.question ?? ctrl?.guidance) && (
-				  <div className="mt-3 pt-3 border-t border-slate-700/50">
-					<p className="text-xs font-medium text-amber-400/80 mb-1">Assessment question</p>
-					<p className="text-slate-400 text-xs leading-relaxed">
-					  {ctrl?.question ?? ctrl?.guidance}
-					</p>
-				  </div>
-				)}
+                {(ctrl?.question ?? ctrl?.guidance) && (
+                  <div className="mt-3 pt-3 border-t border-slate-700/50">
+                    <p className="text-xs font-medium text-amber-400/80 mb-1">Assessment question</p>
+                    <p className="text-slate-400 text-xs leading-relaxed">
+                      {ctrl?.question ?? ctrl?.guidance}
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {/* Debug panel — remove after join is confirmed working */}
-              {import.meta.env.DEV && current && (
-                <div className="bg-slate-950 border border-slate-600 rounded-lg p-3 text-xs font-mono text-slate-400 space-y-1">
-                  <p className="text-slate-300 font-medium">Debug — current result row</p>
-                  <p>result.id: <span className="text-cyan-400">{current.id}</span></p>
-                  <p>result.control_id: <span className="text-cyan-400">{current.control_id}</span></p>
-                  <p>result.control:{' '}
-                    <span className={current.control ? 'text-emerald-400' : 'text-red-400'}>
-                      {current.control
-                        ? `✓ joined — ${current.control.title ?? current.control.name}`
-                        : '✗ NULL — join failed'}
-                    </span>
-                  </p>
-                  <p>aiState.phase: <span className="text-amber-400">{currentAI?.phase ?? 'no state'}</span></p>
-                  {currentAI?.error && <p className="text-red-400">error: {currentAI.error}</p>}
-                </div>
-              )}
-
-              {/* AI Evaluate this control button */}
+              {/* AI Evaluate button */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={evaluateCurrent}

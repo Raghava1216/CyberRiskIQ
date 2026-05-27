@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { fetchResults, updateResult, completeAssessment, buildAIPrompt } from '../lib/complianceData';
 import type {
   ComplianceFramework,
   ComplianceControl,
@@ -54,10 +53,9 @@ export async function fetchAllAssessments(): Promise<ComplianceAssessment[]> {
   return (data ?? []) as ComplianceAssessment[];
 }
 
-// ── Assessment results — two-step fetch (avoids FK alias issues) ──────────────
+// ── Assessment results — two-step fetch ───────────────────────────────────────
 
 export async function fetchResults(assessment_id: string): Promise<AssessmentResult[]> {
-  // Step 1: fetch result rows
   const { data: rows, error } = await supabase
     .from('assessment_results')
     .select('*')
@@ -65,18 +63,15 @@ export async function fetchResults(assessment_id: string): Promise<AssessmentRes
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
 
-  // Step 2: collect unique control ids
   const controlIds = [...new Set(rows.map(r => r.control_id).filter(Boolean))];
   if (controlIds.length === 0) return rows as AssessmentResult[];
 
-  // Step 3: fetch controls by id
   const { data: controls, error: ctrlErr } = await supabase
     .from('compliance_controls')
     .select('*')
     .in('id', controlIds);
   if (ctrlErr) throw ctrlErr;
 
-  // Step 4: manually join
   const controlMap = new Map((controls ?? []).map(c => [c.id, c]));
 
   return rows.map(r => ({
@@ -158,14 +153,13 @@ export async function completeAssessment(assessment_id: string): Promise<number>
   const { error: updateErr } = await supabase
     .from('compliance_assessments')
     .update({
-      status:       'completed',
+      status:        'completed',
       overall_score: overall,
       completed_at:  new Date().toISOString(),
     })
     .eq('id', assessment_id);
   if (updateErr) throw updateErr;
 
-  // Update the framework aggregate score
   const { data: assessment, error: assErr } = await supabase
     .from('compliance_assessments')
     .select('framework_id')
@@ -181,9 +175,9 @@ export async function completeAssessment(assessment_id: string): Promise<number>
     const { error: fwErr } = await supabase
       .from('compliance_frameworks')
       .update({
-        score:                overall,
-        controls_compliant:   compliant,
-        controls_partial:     partial,
+        score:                 overall,
+        controls_compliant:    compliant,
+        controls_partial:      partial,
         controls_noncompliant: noncompliant,
       })
       .eq('id', assessment.framework_id);
@@ -193,7 +187,7 @@ export async function completeAssessment(assessment_id: string): Promise<number>
   return overall;
 }
 
-// ── AI prompt builder — exported so it can be tested independently ────────────
+// ── AI prompt builder — real market-based evaluation ─────────────────────────
 
 export function buildAIPrompt(
   framework: string,
@@ -207,27 +201,111 @@ export function buildAIPrompt(
     || guidance?.trim()
     || 'Is this control fully implemented, documented, and operating effectively?';
 
-  return `You are a senior GRC auditor conducting a compliance assessment for ${framework}.
+  return `You are a senior GRC auditor with 15+ years of experience conducting ${framework} compliance assessments for financial services enterprises.
 
-Control ID: ${controlId}
-Title: "${title}"
-Domain: ${domain}
+You are evaluating control "${controlId}: ${title}" in domain "${domain}".
+
 Assessment question: ${assessmentQuestion}
 
-Assess this control against a typical enterprise environment. Respond ONLY with valid JSON — no markdown, no explanation outside the object:
+## Your task
+Evaluate this control based on REAL-WORLD industry data and current market maturity levels for ${framework} compliance in enterprise financial services organizations. Base your assessment on:
+- How this specific control type typically performs across the industry
+- Known gaps and challenges organizations face with this control
+- Current threat landscape relevance
+- Regulatory enforcement history for this control area
+- Typical implementation maturity in 2024–2025
+
+## Scoring guidance (use the FULL range — do not cluster)
+- 90–100: Fully implemented, tested, documented, with evidence. Rare — only for foundational controls most orgs nail.
+- 75–89: Largely compliant with minor gaps. Common for well-understood controls.
+- 50–74: Partially implemented — policy exists but gaps in execution, testing, or coverage.
+- 25–49: Significant gaps — exists on paper but inadequate implementation.
+- 5–24: Non-existent or severely deficient. Common for emerging/complex controls.
+
+## N/A guidance
+Mark as not_applicable ONLY if this control genuinely does not apply to a typical financial services enterprise (e.g. a healthcare-specific control in a banking assessment). Most controls DO apply — use not_applicable sparingly.
+
+## Status mapping
+- compliant: score 80–100
+- partial: score 35–79
+- noncompliant: score 5–34
+- not_applicable: only if truly irrelevant
+
+Respond ONLY with a single valid JSON object — no markdown fences, no explanation, no text outside the JSON:
 
 {
-  "status": "compliant" | "partial" | "noncompliant",
-  "score": <integer 0–100>,
+  "status": "compliant" | "partial" | "noncompliant" | "not_applicable",
+  "score": <integer 5–100, reflecting genuine market maturity — NOT 70 by default>,
   "risk_level": "none" | "low" | "medium" | "high" | "critical",
-  "finding": "<2–3 sentence factual finding describing what was observed>",
-  "remediation": "<2–3 sentence specific actionable remediation with tools or timeframes>",
-  "due_date": "<ISO date 30–90 days from today if partial or noncompliant, else null>"
+  "finding": "<2–3 sentences grounded in real-world observations specific to ${title} — mention actual evidence types, tools, or gaps typically seen>",
+  "remediation": "<2–3 sentences of specific, actionable steps for ${title} — name actual tools, standards, or timeframes>",
+  "due_date": "<ISO 8601 date 30–90 days from today proportional to severity, or null if compliant>"
 }
 
-Scoring rules:
-- 85–100 → compliant · 50–84 → partial · 0–49 → noncompliant
-- risk_level: none or low for compliant; medium for partial; high or critical for noncompliant
-- finding: realistic enterprise observation referencing specific evidence types
-- remediation: concrete steps referencing specific tools or standards`;
+Critical rules:
+- Score must reflect THIS control's real-world maturity, not a default value
+- finding and remediation must be specific to "${title}", not boilerplate
+- risk_level must align with score: none/low for compliant, medium for partial, high/critical for noncompliant
+- Vary scores meaningfully: some controls score 92, others 18, others 61 — based on reality
+- Do NOT output scores like 67, 68, 70, 72 repeatedly — each control has its own realistic score`;
+}
+
+// ── Groq API call ─────────────────────────────────────────────────────────────
+
+export async function callGeminiForControl(prompt: string): Promise<{
+  status: ControlResultStatus;
+  score: number;
+  risk_level: string;
+  finding: string;
+  remediation: string;
+  due_date: string | null;
+}> {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!apiKey) throw new Error('VITE_GROQ_API_KEY is not set in your .env file');
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a senior GRC auditor. You always respond with a single valid JSON object only — no markdown, no preamble, no explanation outside the JSON. Your assessments are grounded in real-world industry data and vary meaningfully per control.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 1000,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Groq API ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content ?? '';
+  if (!text) throw new Error('Empty response from Groq');
+
+  const clean = text
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+  try {
+    return JSON.parse(clean);
+  } catch {
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error('Could not parse JSON from Groq response');
+  }
 }

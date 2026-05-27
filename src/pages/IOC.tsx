@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import {
   Plus, Search, ChevronDown, Download, Upload,
-  Globe, Hash, Link2, Mail, FileCode, HardDrive, Key, CheckCircle2, Fingerprint,
+  Globe, Hash, Link2, Mail, FileCode, HardDrive, Key,
+  CheckCircle2, Fingerprint,
 } from 'lucide-react';
-import { mockIOCs } from '../lib/mockData';
+import { useIOCStore, iocStore } from '../lib/iocStore';
 import type { IOC } from '../lib/types';
 import AddIOCModal from '../components/AddIOCModal';
 import ImportIOCCSVModal from '../components/ImportIOCCSVModal';
 
-const TYPES = ['All', 'IP', 'Domain', 'URL', 'Hash', 'Email', 'File', 'Registry', 'Certificate'];
+const TYPES     = ['All', 'IP', 'Domain', 'URL', 'Hash', 'Email', 'File', 'Registry', 'Certificate'];
 const SEVERITIES = ['All', 'Critical', 'High', 'Medium', 'Low'];
-const STATUSES = ['All', 'Active', 'Inactive', 'Under Review', 'Whitelisted'];
+const STATUSES  = ['All', 'Active', 'Inactive', 'Under Review', 'Whitelisted'];
 
 const typeIcon = (type: string) => {
   switch (type) {
@@ -82,27 +83,21 @@ function ConfidenceBar({ value }: { value: number }) {
 }
 
 function exportToCSV(iocs: IOC[]) {
-  const headers = ['ID', 'Value', 'Type', 'Severity', 'Status', 'Confidence', 'Source', 'Threat Actor', 'Tags', 'First Seen', 'Last Seen', 'Expiry Date', 'Related Incident', 'Description'];
-  const rows = iocs.map((i) => [
+  const headers = ['ID','Value','Type','Severity','Status','Confidence','Source','Threat Actor','Tags','First Seen','Last Seen','Expiry Date','Related Incident','Description'];
+  const rows = iocs.map(i => [
     i.id,
     `"${i.value.replace(/"/g, '""')}"`,
-    i.type,
-    i.severity,
-    i.status,
-    i.confidence,
+    i.type, i.severity, i.status, i.confidence,
     `"${i.source}"`,
     `"${i.threat_actor}"`,
     `"${i.tags.join('; ')}"`,
-    i.first_seen,
-    i.last_seen,
-    i.expiry_date,
-    i.related_incident,
-    `"${i.description.replace(/"/g, '""')}"`,
+    i.first_seen, i.last_seen, i.expiry_date, i.related_incident,
+    `"${(i.description || '').replace(/"/g, '""')}"`,
   ]);
-  const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  const csv  = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
   a.href = url;
   a.download = `ioc-register-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
@@ -112,14 +107,16 @@ function exportToCSV(iocs: IOC[]) {
 }
 
 export default function IOCPage() {
-  const [iocs, setIOCs] = useState<IOC[]>(mockIOCs as IOC[]);
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('All');
-  const [sevFilter, setSevFilter] = useState('All');
+  // ── Use shared store — reflects additions from Threats page instantly ──────
+  const iocs = useIOCStore();
+
+  const [search,       setSearch]       = useState('');
+  const [typeFilter,   setTypeFilter]   = useState('All');
+  const [sevFilter,    setSevFilter]    = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [addOpen, setAddOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [addOpen,      setAddOpen]      = useState(false);
+  const [importOpen,   setImportOpen]   = useState(false);
+  const [toast,        setToast]        = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -127,37 +124,38 @@ export default function IOCPage() {
   };
 
   const handleAdd = (ioc: IOC) => {
-    setIOCs((prev) => [ioc, ...prev]);
+    const added = iocStore.add(ioc);
     setAddOpen(false);
-    showToast(`IOC "${ioc.value}" added successfully`);
+    showToast(added > 0 ? `IOC "${ioc.value}" added` : `IOC "${ioc.value}" already exists`);
   };
 
   const handleImport = (newIOCs: IOC[]) => {
-    setIOCs((prev) => [...newIOCs, ...prev]);
-    showToast(`${newIOCs.length} ${newIOCs.length === 1 ? 'IOC' : 'IOCs'} imported successfully`);
+    const added = iocStore.add(newIOCs);
+    showToast(`${added} ${added === 1 ? 'IOC' : 'IOCs'} imported (${newIOCs.length - added} duplicates skipped)`);
   };
 
-  const filtered = iocs.filter((i) => {
+  const filtered = iocs.filter(i => {
     const matchSearch =
       i.value.toLowerCase().includes(search.toLowerCase()) ||
       i.source.toLowerCase().includes(search.toLowerCase()) ||
       i.threat_actor.toLowerCase().includes(search.toLowerCase()) ||
-      i.tags.some((t) => t.includes(search.toLowerCase()));
-    const matchType   = typeFilter === 'All' || i.type === typeFilter;
-    const matchSev    = sevFilter === 'All' || i.severity === sevFilter;
-    const matchStatus = statusFilter === 'All' || i.status === statusFilter;
+      i.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
+    const matchType   = typeFilter   === 'All' || i.type     === typeFilter;
+    const matchSev    = sevFilter    === 'All' || i.severity === sevFilter;
+    const matchStatus = statusFilter === 'All' || i.status   === statusFilter;
     return matchSearch && matchType && matchSev && matchStatus;
   });
 
   const stats = {
     total:    iocs.length,
-    critical: iocs.filter((i) => i.severity === 'Critical').length,
-    active:   iocs.filter((i) => i.status === 'Active').length,
-    review:   iocs.filter((i) => i.status === 'Under Review').length,
+    critical: iocs.filter(i => i.severity === 'Critical').length,
+    active:   iocs.filter(i => i.status   === 'Active').length,
+    review:   iocs.filter(i => i.status   === 'Under Review').length,
   };
 
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-screen-2xl relative">
+
       {addOpen    && <AddIOCModal       onClose={() => setAddOpen(false)}    onSubmit={handleAdd}    />}
       {importOpen && <ImportIOCCSVModal onClose={() => setImportOpen(false)} onImport={handleImport} />}
 
@@ -199,11 +197,11 @@ export default function IOCPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Total IOCs',      value: stats.total,    color: 'text-blue-400',    bg: 'bg-blue-500/10 border-blue-500/20' },
-          { label: 'Critical',        value: stats.critical, color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/20' },
-          { label: 'Active',          value: stats.active,   color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/20' },
-          { label: 'Under Review',    value: stats.review,   color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/20' },
-        ].map((s) => (
+          { label: 'Total IOCs',   value: stats.total,    color: 'text-blue-400',   bg: 'bg-blue-500/10 border-blue-500/20'     },
+          { label: 'Critical',     value: stats.critical, color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20'       },
+          { label: 'Active',       value: stats.active,   color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
+          { label: 'Under Review', value: stats.review,   color: 'text-amber-400',  bg: 'bg-amber-500/10 border-amber-500/20'   },
+        ].map(s => (
           <div key={s.label} className={`rounded-xl border p-4 ${s.bg}`}>
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
             <p className="text-slate-400 text-sm">{s.label}</p>
@@ -213,9 +211,9 @@ export default function IOCPage() {
 
       {/* IOC type distribution */}
       <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-        {(['IP', 'Domain', 'URL', 'Hash', 'Email', 'File', 'Registry', 'Certificate'] as IOC['type'][]).map((t) => {
-          const count = iocs.filter((i) => i.type === t).length;
-          const Icon = typeIcon(t);
+        {(['IP','Domain','URL','Hash','Email','File','Registry','Certificate'] as IOC['type'][]).map(t => {
+          const count  = iocs.filter(i => i.type === t).length;
+          const Icon   = typeIcon(t);
           const colors = typeColor(t);
           return (
             <button
@@ -241,23 +239,23 @@ export default function IOCPage() {
           <Search size={16} className="text-slate-500" />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Search by value, source, actor, or tag..."
             className="bg-transparent text-slate-300 text-sm outline-none flex-1 placeholder:text-slate-600"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
           {[
-            { value: sevFilter, set: setSevFilter, options: SEVERITIES, placeholder: 'Severity' },
-            { value: statusFilter, set: setStatusFilter, options: STATUSES, placeholder: 'Status' },
+            { value: sevFilter,    set: setSevFilter,    options: SEVERITIES, placeholder: 'Severity' },
+            { value: statusFilter, set: setStatusFilter, options: STATUSES,   placeholder: 'Status'   },
           ].map(({ value, set, options, placeholder }) => (
             <div key={placeholder} className="relative">
               <select
                 value={value}
-                onChange={(e) => set(e.target.value)}
+                onChange={e => set(e.target.value)}
                 className="appearance-none bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 pr-8 outline-none focus:border-cyan-500 cursor-pointer"
               >
-                {options.map((o) => <option key={o}>{o}</option>)}
+                {options.map(o => <option key={o}>{o}</option>)}
               </select>
               <ChevronDown size={14} className="absolute right-2 top-3 text-slate-500 pointer-events-none" />
             </div>
@@ -271,78 +269,70 @@ export default function IOCPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-700/50">
-                {['Indicator', 'Type', 'Severity', 'Confidence', 'Source', 'Threat Actor', 'Status', 'Last Seen', ''].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                    {h}
-                  </th>
+                {['Indicator','Type','Severity','Confidence','Source','Threat Actor','Status','Last Seen',''].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/30">
-              {filtered.map((ioc) => {
-                const Icon = typeIcon(ioc.type);
-                const tc = typeColor(ioc.type);
+              {filtered.map(ioc => {
+                const Icon   = typeIcon(ioc.type);
+                const tc     = typeColor(ioc.type);
+                const isNew  = !ioc.id.startsWith('mock') && Date.now() - new Date(ioc.first_seen).getTime() < 10 * 60 * 1000;
                 return (
                   <tr key={ioc.id} className="hover:bg-slate-800/40 transition-colors group">
-
-                    {/* Value */}
                     <td className="px-4 py-3 max-w-xs">
                       <div className="flex items-center gap-2">
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${tc}`}>
                           <Icon size={14} />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-slate-200 font-mono text-xs truncate max-w-[200px]">{ioc.value}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-slate-200 font-mono text-xs truncate max-w-[200px]">{ioc.value}</p>
+                            {isNew && (
+                              <span className="text-xs bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 px-1.5 py-px rounded flex-shrink-0">New</span>
+                            )}
+                          </div>
                           <div className="flex gap-1 mt-0.5 flex-wrap">
-                            {ioc.tags.slice(0, 2).map((t) => (
+                            {ioc.tags.slice(0, 2).map(t => (
                               <span key={t} className="text-[10px] bg-slate-700/50 text-slate-500 px-1.5 py-0.5 rounded">{t}</span>
                             ))}
                           </div>
                         </div>
                       </div>
                     </td>
-
-                    {/* Type */}
                     <td className="px-4 py-3">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded ${tc}`}>{ioc.type}</span>
                     </td>
-
-                    {/* Severity */}
                     <td className="px-4 py-3">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${sevColor(ioc.severity)}`}>{ioc.severity}</span>
                     </td>
-
-                    {/* Confidence */}
                     <td className="px-4 py-3 min-w-[110px]">
                       <ConfidenceBar value={ioc.confidence} />
                     </td>
-
-                    {/* Source */}
                     <td className="px-4 py-3">
                       <span className="text-slate-400 text-xs whitespace-nowrap">{ioc.source}</span>
                     </td>
-
-                    {/* Threat Actor */}
                     <td className="px-4 py-3">
                       <span className="text-slate-400 text-xs whitespace-nowrap">{ioc.threat_actor}</span>
                     </td>
-
-                    {/* Status */}
                     <td className="px-4 py-3">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded border whitespace-nowrap ${statusColor(ioc.status)}`}>
                         {ioc.status}
                       </span>
                     </td>
-
-                    {/* Last Seen */}
                     <td className="px-4 py-3">
                       <span className="text-slate-500 text-xs whitespace-nowrap">{timeAgo(ioc.last_seen)}</span>
                     </td>
-
-                    {/* Action */}
                     <td className="px-4 py-3">
-                      <button className="text-slate-600 hover:text-cyan-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                        View →
+                      <button
+                        onClick={() => {
+                          iocStore.remove(ioc.id);
+                          showToast(`IOC "${ioc.value}" removed`);
+                        }}
+                        className="text-slate-600 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        Remove
                       </button>
                     </td>
                   </tr>
