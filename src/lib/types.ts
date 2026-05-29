@@ -13,7 +13,8 @@ export type NavPage =
   | 'incidents'
   | 'compliance'
   | 'reports'
-  | 'settings';
+  | 'settings'
+  | 'wazuh';
 
 export interface IOC {
   id: string;

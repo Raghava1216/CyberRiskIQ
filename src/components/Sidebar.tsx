@@ -31,6 +31,7 @@ const navItems: { id: NavPage; label: string; icon: React.ElementType; badge?: n
   { id: 'compliance', label: 'Compliance', icon: CheckSquare },
   { id: 'reports', label: 'Reports', icon: BarChart2 },
   { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'wazuh', label: 'Wazuh SIEM', icon:  Shield},
 ];
 
 export default function Sidebar({ activePage, onNavigate, collapsed }: SidebarProps) {
