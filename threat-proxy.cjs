@@ -443,15 +443,15 @@ async function fetchCVELibrary(search = '', severity = '') {
 const WAZUH = {
   // ── Manager REST API ──────────────────────────────────────────────────────
   manager_host: '192.168.1.212',
-  manager_port: 55000,            // Wazuh REST API port (confirmed: 55000)
-  username:     'wazuh',          // Wazuh API user  (default: wazuh / wazuh-wui)
-  password:     'wazuh',          // Wazuh API pass  (set during Wazuh install)
+  manager_port: 443,              // Wazuh on standard HTTPS port 443
+  username:     'pramod',         // ← your Wazuh username
+  password:     'YOUR_PASSWORD',  // ← replace with pramod's password
 
   // ── Wazuh Indexer (OpenSearch) — for vulnerabilities ──────────────────────
   indexer_host: '192.168.1.212',
-  indexer_port: 9200,             // Indexer port (default: 9200)
-  indexer_user: 'admin',          // Indexer admin user
-  indexer_pass: 'admin',          // Indexer admin password (set during install)
+  indexer_port: 9200,
+  indexer_user: 'pramod',         // ← same username
+  indexer_pass: 'YOUR_PASSWORD',  // ← replace with pramod's password
 
   // Keep false — required for self-signed certs (standard on internal installs)
   rejectUnauthorized: false,
@@ -469,7 +469,7 @@ const TTL_LONG  = 60 * 60_000;  // 1 hr   — MITRE techniques
 
 // ── Auto-discovered working port (set at proxy startup) ───────────────────────
 // Wazuh dashboard:   https://host:443   (what you browse to in the browser)
-// Wazuh API:         https://host:55000 (REST API — confirmed port)
+// Wazuh API:         https://host:443   (standard HTTPS — same port as dashboard)
 // These are two different services on two different ports.
 let DISCOVERED_MANAGER_PORT = WAZUH.manager_port; // start with configured value
 
@@ -507,7 +507,7 @@ async function probeWazuhPort(host, port) {
 async function discoverWazuhPort() {
   const candidates = [
     WAZUH.manager_port,        // configured value first
-    55000, 443, 4443,     // other candidate ports
+    443, 55000, 4443,     // try 443 first (no explicit port = 443 in HTTPS)
   ];
   const unique = [...new Set(candidates)];
 
@@ -997,7 +997,7 @@ function handleWazuhRoutes(reqPath, url, res) {
       });
 
       // 1. Probe candidate manager ports
-      const mgPorts = [55000, 443, 4443];
+      const mgPorts = [443, 55000, 4443];
       for (const port of mgPorts) {
         const r = await probe(WAZUH.manager_host, port, '/');
         results.manager[port] = {

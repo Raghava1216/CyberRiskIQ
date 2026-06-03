@@ -25,7 +25,7 @@ function loadConfig(): WazuhConfig {
   } catch {}
   return {
     host:     '192.168.1.212',
-    port:     '55000',
+    port:     '443',
     username: 'wazuh',
     password: '',
     enabled:  false,
@@ -157,7 +157,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <h3 className="text-slate-100 font-semibold text-sm">Wazuh API Connection</h3>
-                  <p className="text-slate-500 text-xs">API on port 55000</p>
+                  <p className="text-slate-500 text-xs">API on port 443</p>
                 </div>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -190,14 +190,14 @@ export default function Settings() {
                   <input
                     value={config.port}
                     onChange={e => set('port', e.target.value)}
-                    placeholder="55000"
+                    placeholder="443"
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyan-500 transition-colors font-mono"
                   />
                 </div>
               </div>
 
               {/* Manager API Credentials */}
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest pt-1">Manager API (port 55000)</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest pt-1">Manager API (port 443)</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
@@ -263,7 +263,7 @@ export default function Settings() {
               {/* Important note */}
               <div className="space-y-2">
                 <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-4 py-3 text-xs text-amber-400/80 leading-relaxed space-y-1.5">
-                  <p><strong className="text-amber-300">API port is 55000</strong> — confirmed responding. The issue is credentials.</p>
+                  <p>The API runs on port <strong className="text-amber-300">443</strong> — no port number needed in the URL, same as the dashboard.</p>
                   <p><strong className="text-amber-300">These are NOT your dashboard login.</strong> Find the API user in Wazuh:<br/>
                   <em>Server Management → Settings → API</em> — the username is shown there.</p>
                   <p>To find/reset the password on your Wazuh server terminal:<br/>
