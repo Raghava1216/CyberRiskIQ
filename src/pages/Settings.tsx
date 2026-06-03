@@ -61,26 +61,36 @@ export default function Settings() {
   };
 
   const testConnection = async () => {
-    setConn({ state: 'testing', message: 'Connecting to Wazuh API…' });
+    setConn({ state: 'testing', message: 'Running port probe and auth test…' });
     try {
-      const res  = await fetch(`${PROXY}/wazuh/stats`);
-      if (!res.ok) throw new Error(`Proxy returned HTTP ${res.status}. Make sure node threat-proxy.cjs is running.`);
-      const json = await res.json();
+      // First run diagnostics to get clear port/auth info
+      const diagRes  = await fetch(`${PROXY}/wazuh/diagnose`);
+      if (!diagRes.ok) throw new Error(`Proxy not running (HTTP ${diagRes.status}). Start it: node threat-proxy.cjs`);
+      const diagJson = await diagRes.json();
+      const summary  = diagJson.results?.summary || [];
+      const fix      = diagJson.fix || '';
 
-      if (!json.success || !json.data) {
+      // Check if auth succeeded
+      const authOk = diagJson.results?.auth?.success;
+      if (!authOk) {
+        const authErr = summary.find((s: string) => s.includes('credentials') || s.includes('401') || s.includes('cannot reach') || s.includes('Cannot reach'));
         setConn({
           state:   'error',
-          message: json.error || 'Wazuh API responded but returned an error. Check credentials in threat-proxy.cjs → WAZUH_CONFIG.',
+          message: (authErr || fix || summary.join(' | ') || 'Could not authenticate with Wazuh'),
         });
         return;
       }
 
+      // Auth worked — now get actual stats
+      const statsRes  = await fetch(`${PROXY}/wazuh/stats`);
+      const statsJson = await statsRes.json();
+
       setConn({
         state:   'success',
-        message: 'Connected successfully',
-        manager: json.data.manager?.hostname || config.host,
-        agents:  json.data.agents?.active || 0,
-        version: json.data.manager?.version || '',
+        message: fix || 'Connected successfully',
+        manager: statsJson.data?.manager?.hostname || config.host,
+        agents:  statsJson.data?.agents?.active || 0,
+        version: statsJson.data?.manager?.version || diagJson.results?.manager?.[diagJson.results?.auth?.port]?.version || '',
       });
     } catch (err) {
       const msg = (err as Error).message;
@@ -147,7 +157,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <h3 className="text-slate-100 font-semibold text-sm">Wazuh API Connection</h3>
-                  <p className="text-slate-500 text-xs">REST API at port 55000</p>
+                  <p className="text-slate-500 text-xs">API on port 55000</p>
                 </div>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -251,8 +261,18 @@ export default function Settings() {
               </div>
 
               {/* Important note */}
-              <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-4 py-3 text-xs text-amber-400/80 leading-relaxed">
-                <strong className="text-amber-400">Important:</strong> After updating credentials here, also update <code className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400">WAZUH_CONFIG</code> in <code className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400">threat-proxy.cjs</code> and restart the proxy with <code className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400">node threat-proxy.cjs</code>. The proxy handles the actual API calls.
+              <div className="space-y-2">
+                <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-4 py-3 text-xs text-amber-400/80 leading-relaxed space-y-1.5">
+                  <p><strong className="text-amber-300">API port is 55000</strong> — confirmed responding. The issue is credentials.</p>
+                  <p><strong className="text-amber-300">These are NOT your dashboard login.</strong> Find the API user in Wazuh:<br/>
+                  <em>Server Management → Settings → API</em> — the username is shown there.</p>
+                  <p>To find/reset the password on your Wazuh server terminal:<br/>
+                  <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">sudo cat /etc/wazuh-indexer/opensearch.yml</code><br/>
+                  or use the Wazuh password tool to reset all credentials.</p>
+                </div>
+                <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-4 py-3 text-xs text-amber-400/80 leading-relaxed">
+                  <strong className="text-amber-400">After any change:</strong> Update <code className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400">WAZUH</code> in <code className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400">threat-proxy.cjs</code> and restart: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400">node threat-proxy.cjs</code>
+                </div>
               </div>
 
               {/* Action buttons */}
@@ -341,7 +361,7 @@ export default function Settings() {
             <ol className="space-y-2.5 text-xs text-slate-400">
               {[
                 { step: '1', text: 'Open threat-proxy.cjs and find the WAZUH config block near the top' },
-                { step: '2', text: 'Set manager credentials: username / password (used for JWT auth at port 55000)' },
+                { step: '2', text: 'Set manager credentials: username / password (used for JWT auth at port 443)' },
                 { step: '3', text: 'Set indexer credentials: indexer_user / indexer_pass (admin at port 9200 — needed for vulnerabilities)' },
                 { step: '4', text: 'Run: node threat-proxy.cjs in a terminal and keep it running' },
                 { step: '5', text: 'Click "Test Connection" above — it will confirm manager API connectivity' },

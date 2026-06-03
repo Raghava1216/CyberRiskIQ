@@ -429,31 +429,31 @@ async function fetchCVELibrary(search = '', severity = '') {
 // ══════════════════════════════════════════════════════════════════════════════
 //  WAZUH 4.14.x INTEGRATION  ·  Two-backend architecture
 //
-//  • Manager API  → https://192.168.1.212:55000  (JWT auth)
-//    - Agents, Alerts, MITRE ATT&CK, SCA, Manager info
+//  DASHBOARD (browser): https://192.168.1.212       — port 443  (what you visit)
+//  MANAGER API:         https://192.168.1.212      — port 443  (JWT auth)
+//  INDEXER API:         https://192.168.1.212:9200  — port 9200  (OpenSearch)
 //
-//  • Indexer API  → https://192.168.1.212:9200   (Basic auth — admin credentials)
-//    - Vulnerabilities (wazuh-states-vulnerabilities-* index)
-//    - Inventory      (wazuh-states-inventory-*       index)
+//  The dashboard and the REST API are on DIFFERENT ports.
+//  To find your API port: Wazuh dashboard → Server management → Settings → API
 //
-//  IMPORTANT: From Wazuh 4.8 the /vulnerability/{agent_id} manager endpoint
-//  was removed. All vuln data is now in the Wazuh Indexer (OpenSearch).
+//  TROUBLESHOOTING: GET http://localhost:3001/wazuh/diagnose
+//  This endpoint probes all candidate ports and returns the exact error.
 // ══════════════════════════════════════════════════════════════════════════════
 
 const WAZUH = {
-  // ── Manager API (port 55000) ──────────────────────────────────────────────
+  // ── Manager REST API ──────────────────────────────────────────────────────
   manager_host: '192.168.1.212',
-  manager_port: 55000,
-  username:     'wazuh',          // ← your Wazuh API username
-  password:     'wazuh',          // ← your Wazuh API password
+  manager_port: 55000,            // Wazuh REST API port (confirmed: 55000)
+  username:     'wazuh',          // Wazuh API user  (default: wazuh / wazuh-wui)
+  password:     'wazuh',          // Wazuh API pass  (set during Wazuh install)
 
-  // ── Indexer API (port 9200) — uses the same admin credentials by default ──
+  // ── Wazuh Indexer (OpenSearch) — for vulnerabilities ──────────────────────
   indexer_host: '192.168.1.212',
-  indexer_port: 9200,
-  indexer_user: 'admin',          // ← Wazuh Indexer admin user (usually 'admin')
-  indexer_pass: 'admin',          // ← Wazuh Indexer admin password
+  indexer_port: 9200,             // Indexer port (default: 9200)
+  indexer_user: 'admin',          // Indexer admin user
+  indexer_pass: 'admin',          // Indexer admin password (set during install)
 
-  // Set false for self-signed certs (true = full TLS verification)
+  // Keep false — required for self-signed certs (standard on internal installs)
   rejectUnauthorized: false,
 };
 
@@ -466,6 +466,71 @@ const _cache    = {};
 const TTL_SHORT = 60_000;        // 1 min  — alerts, threats
 const TTL_MED   = 5 * 60_000;   // 5 min  — agents, vulns
 const TTL_LONG  = 60 * 60_000;  // 1 hr   — MITRE techniques
+
+// ── Auto-discovered working port (set at proxy startup) ───────────────────────
+// Wazuh dashboard:   https://host:443   (what you browse to in the browser)
+// Wazuh API:         https://host:55000 (REST API — confirmed port)
+// These are two different services on two different ports.
+let DISCOVERED_MANAGER_PORT = WAZUH.manager_port; // start with configured value
+
+// Probe a port — returns true if it looks like Wazuh REST API
+async function probeWazuhPort(host, port) {
+  return new Promise(resolve => {
+    const req = https.request({
+      hostname: host, port, path: '/',
+      method: 'GET',
+      rejectUnauthorized: false,
+      headers: { Accept: 'application/json' },
+    }, res => {
+      let raw = '';
+      res.on('data', c => raw += c);
+      res.on('end', () => {
+        try {
+          const body = JSON.parse(raw);
+          // Wazuh API root returns { data: { title: "Wazuh API REST", ... } }
+          const isWazuh = body?.data?.title?.toLowerCase().includes('wazuh') ||
+                          body?.title?.toLowerCase().includes('wazuh');
+          resolve({ reachable: true, isWazuh, status: res.statusCode, body });
+        } catch {
+          // Port responded but not JSON — not the API
+          resolve({ reachable: true, isWazuh: false, status: res.statusCode });
+        }
+      });
+    });
+    req.setTimeout(4000, () => { req.destroy(); resolve({ reachable: false }); });
+    req.on('error', () => resolve({ reachable: false }));
+    req.end();
+  });
+}
+
+// Run at startup — try common Wazuh API ports and pick the first that responds
+async function discoverWazuhPort() {
+  const candidates = [
+    WAZUH.manager_port,        // configured value first
+    55000, 443, 4443,     // other candidate ports
+  ];
+  const unique = [...new Set(candidates)];
+
+  console.log(`
+  [Wazuh] Scanning for API on ${WAZUH.manager_host}...`);
+
+  for (const port of unique) {
+    const result = await probeWazuhPort(WAZUH.manager_host, port);
+    if (result.isWazuh) {
+      DISCOVERED_MANAGER_PORT = port;
+      console.log(`  [Wazuh] ✓ API found on port ${port} (${result.body?.data?.api_version || result.body?.data?.title || ''})`);
+      return port;
+    } else if (result.reachable) {
+      console.log(`  [Wazuh]   port ${port} → HTTP ${result.status} (not Wazuh API)`);
+    } else {
+      console.log(`  [Wazuh]   port ${port} → no response`);
+    }
+  }
+
+  console.log(`  [Wazuh] ✗ Could not find API on any port. Using configured port ${DISCOVERED_MANAGER_PORT}.`);
+  console.log(`  [Wazuh]   To debug: GET http://localhost:${PORT}/wazuh/diagnose`);
+  return DISCOVERED_MANAGER_PORT;
+}
 
 // ── Low-level HTTPS helper ────────────────────────────────────────────────────
 
@@ -499,7 +564,7 @@ async function getJWT() {
   const creds = Buffer.from(`${WAZUH.username}:${WAZUH.password}`).toString('base64');
   const r = await doRequest({
     hostname: WAZUH.manager_host,
-    port:     WAZUH.manager_port,
+    port:     DISCOVERED_MANAGER_PORT,
     path:     '/security/user/authenticate?raw=true',
     method:   'POST',
     rejectUnauthorized: WAZUH.rejectUnauthorized,
@@ -527,7 +592,7 @@ async function managerGet(path, ttl = TTL_MED) {
   const token = await getJWT();
   let r = await doRequest({
     hostname: WAZUH.manager_host,
-    port:     WAZUH.manager_port,
+    port:     DISCOVERED_MANAGER_PORT,
     path,
     method:   'GET',
     rejectUnauthorized: WAZUH.rejectUnauthorized,
@@ -540,7 +605,7 @@ async function managerGet(path, ttl = TTL_MED) {
     const t2 = await getJWT();
     r = await doRequest({
       hostname: WAZUH.manager_host,
-      port:     WAZUH.manager_port,
+      port:     DISCOVERED_MANAGER_PORT,
       path,
       method:   'GET',
       rejectUnauthorized: WAZUH.rejectUnauthorized,
@@ -906,6 +971,102 @@ function handleWazuhRoutes(reqPath, url, res) {
     return true;
   }
 
+  // ── /wazuh/diagnose  — port probe + auth test ── ────────────────────────
+  if (sub === '/diagnose') {
+    (async () => {
+      const results = { manager: {}, indexer: {}, summary: [] };
+
+      // Helper: probe a host:port with HTTPS
+      const probe = (host, port, path, headers = {}) => new Promise(resolve => {
+        const opts = {
+          hostname: host, port, path, method: 'GET',
+          rejectUnauthorized: false,
+          headers: { Accept: 'application/json', ...headers },
+        };
+        const req = https.request(opts, r => {
+          let raw = '';
+          r.on('data', c => raw += c);
+          r.on('end', () => {
+            try { resolve({ status: r.statusCode, body: JSON.parse(raw), raw: raw.slice(0,300) }); }
+            catch { resolve({ status: r.statusCode, body: null, raw: raw.slice(0,300) }); }
+          });
+        });
+        req.setTimeout(5000, () => { req.destroy(); resolve({ status: 0, error: 'timeout' }); });
+        req.on('error', e => resolve({ status: 0, error: e.message }));
+        req.end();
+      });
+
+      // 1. Probe candidate manager ports
+      const mgPorts = [55000, 443, 4443];
+      for (const port of mgPorts) {
+        const r = await probe(WAZUH.manager_host, port, '/');
+        results.manager[port] = {
+          reachable: r.status > 0,
+          status:    r.status,
+          isWazuh:   !!(r.body?.data?.title?.includes('Wazuh')),
+          title:     r.body?.data?.title || '',
+          version:   r.body?.data?.api_version || '',
+          error:     r.error || null,
+          raw:       r.raw,
+        };
+        if (results.manager[port].isWazuh) {
+          results.summary.push(`Manager API found on port ${port} (${r.body.data.api_version})`);
+        } else if (r.status > 0) {
+          results.summary.push(`Port ${port} responded HTTP ${r.status} but is not Wazuh API`);
+        } else {
+          results.summary.push(`Port ${port}: ${r.error || 'no response'}`);
+        }
+      }
+
+      // 2. Try auth on the working port
+      const workingMgPort = mgPorts.find(p => results.manager[p]?.isWazuh);
+      if (workingMgPort) {
+        const creds = Buffer.from(WAZUH.username + ':' + WAZUH.password).toString('base64');
+        const authR = await probe(WAZUH.manager_host, workingMgPort,
+          '/security/user/authenticate?raw=true',
+          { Authorization: 'Basic ' + creds });
+        results.auth = {
+          port:      workingMgPort,
+          status:    authR.status,
+          success:   authR.status === 200,
+          tokenLen:  typeof authR.body === 'string' ? authR.body.length : 0,
+          error:     authR.status !== 200 ? authR.raw : null,
+        };
+        if (authR.status === 200) {
+          results.summary.push('Auth OK — JWT obtained. Update manager_port to ' + workingMgPort);
+        } else if (authR.status === 401) {
+          results.summary.push('Port ' + workingMgPort + ' reachable but credentials rejected (401). Check username/password.');
+        } else {
+          results.summary.push('Auth returned HTTP ' + authR.status + ': ' + authR.raw);
+        }
+      } else {
+        results.summary.push('No Wazuh Manager API found on any candidate port. Check firewall / port config.');
+      }
+
+      // 3. Probe indexer
+      const idxR = await probe(WAZUH.indexer_host, WAZUH.indexer_port, '/');
+      results.indexer[WAZUH.indexer_port] = {
+        reachable: idxR.status > 0,
+        status:    idxR.status,
+        isOpenSearch: !!(idxR.body?.version || idxR.body?.tagline),
+        error:     idxR.error || null,
+      };
+      if (idxR.status > 0) {
+        results.summary.push('Indexer port ' + WAZUH.indexer_port + ': HTTP ' + idxR.status +
+          (idxR.body?.version ? ' (OpenSearch ' + (idxR.body.version?.number || '') + ')' : ''));
+      } else {
+        results.summary.push('Indexer port ' + WAZUH.indexer_port + ': ' + (idxR.error || 'no response'));
+      }
+
+      res.writeHead(200);
+      res.end(JSON.stringify({ success: true, results, fix: workingMgPort && workingMgPort !== DISCOVERED_MANAGER_PORT
+        ? 'Change manager_port to ' + workingMgPort + ' in threat-proxy.cjs'
+        : workingMgPort ? 'manager_port is correct' : 'Cannot reach Wazuh — check host/firewall'
+      }, null, 2));
+    })();
+    return true;
+  }
+
   return false; // not a /wazuh route
 }
 
@@ -970,6 +1131,9 @@ server.on('error', err => {
   }
   process.exit(1);
 });
+
+// ── Boot: auto-discover Wazuh API port before accepting requests ──────────────
+discoverWazuhPort().catch(() => {});
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`\nCyberRiskIQ Threat Feed Proxy`);
