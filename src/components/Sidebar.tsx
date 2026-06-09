@@ -49,7 +49,7 @@ export default function Sidebar({ activePage, onNavigate, collapsed }: SidebarPr
         {!collapsed && (
           <div>
             <p className="text-white font-bold text-sm leading-tight">CyberRisk IQ</p>
-            <p className="text-slate-500 text-xs">by Regorisk · ProGReC</p>
+            <p className="text-slate-500 text-xs">by ReGoRisC · ProGReC</p>
           </div>
         )}
       </div>

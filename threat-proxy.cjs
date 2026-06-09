@@ -443,7 +443,7 @@ async function fetchCVELibrary(search = '', severity = '') {
 const WAZUH = {
   // ── Manager REST API ──────────────────────────────────────────────────────
   manager_host: '192.168.1.212',
-  manager_port: 443,              // Wazuh on standard HTTPS port 443
+  manager_port: 55000,            // Wazuh REST API — confirmed on port 55000
   username:     'pramod',         // ← your Wazuh username
   password:     'YOUR_PASSWORD',  // ← replace with pramod's password
 
@@ -471,65 +471,15 @@ const TTL_LONG  = 60 * 60_000;  // 1 hr   — MITRE techniques
 // Wazuh dashboard:   https://host:443   (what you browse to in the browser)
 // Wazuh API:         https://host:443   (standard HTTPS — same port as dashboard)
 // These are two different services on two different ports.
-let DISCOVERED_MANAGER_PORT = WAZUH.manager_port; // start with configured value
+let DISCOVERED_MANAGER_PORT = WAZUH.manager_port; // confirmed port 55000
 
-// Probe a port — returns true if it looks like Wazuh REST API
-async function probeWazuhPort(host, port) {
-  return new Promise(resolve => {
-    const req = https.request({
-      hostname: host, port, path: '/',
-      method: 'GET',
-      rejectUnauthorized: false,
-      headers: { Accept: 'application/json' },
-    }, res => {
-      let raw = '';
-      res.on('data', c => raw += c);
-      res.on('end', () => {
-        try {
-          const body = JSON.parse(raw);
-          // Wazuh API root returns { data: { title: "Wazuh API REST", ... } }
-          const isWazuh = body?.data?.title?.toLowerCase().includes('wazuh') ||
-                          body?.title?.toLowerCase().includes('wazuh');
-          resolve({ reachable: true, isWazuh, status: res.statusCode, body });
-        } catch {
-          // Port responded but not JSON — not the API
-          resolve({ reachable: true, isWazuh: false, status: res.statusCode });
-        }
-      });
-    });
-    req.setTimeout(4000, () => { req.destroy(); resolve({ reachable: false }); });
-    req.on('error', () => resolve({ reachable: false }));
-    req.end();
-  });
-}
+// probeWazuhPort removed — port 55000 confirmed
 
-// Run at startup — try common Wazuh API ports and pick the first that responds
-async function discoverWazuhPort() {
-  const candidates = [
-    WAZUH.manager_port,        // configured value first
-    443, 55000, 4443,     // try 443 first (no explicit port = 443 in HTTPS)
-  ];
-  const unique = [...new Set(candidates)];
-
-  console.log(`
-  [Wazuh] Scanning for API on ${WAZUH.manager_host}...`);
-
-  for (const port of unique) {
-    const result = await probeWazuhPort(WAZUH.manager_host, port);
-    if (result.isWazuh) {
-      DISCOVERED_MANAGER_PORT = port;
-      console.log(`  [Wazuh] ✓ API found on port ${port} (${result.body?.data?.api_version || result.body?.data?.title || ''})`);
-      return port;
-    } else if (result.reachable) {
-      console.log(`  [Wazuh]   port ${port} → HTTP ${result.status} (not Wazuh API)`);
-    } else {
-      console.log(`  [Wazuh]   port ${port} → no response`);
-    }
-  }
-
-  console.log(`  [Wazuh] ✗ Could not find API on any port. Using configured port ${DISCOVERED_MANAGER_PORT}.`);
-  console.log(`  [Wazuh]   To debug: GET http://localhost:${PORT}/wazuh/diagnose`);
-  return DISCOVERED_MANAGER_PORT;
+// Port 55000 confirmed — no scanning needed
+function discoverWazuhPort() {
+  DISCOVERED_MANAGER_PORT = WAZUH.manager_port;
+  console.log(`  [Wazuh] API confirmed on port ${DISCOVERED_MANAGER_PORT}`);
+  return Promise.resolve(DISCOVERED_MANAGER_PORT);
 }
 
 // ── Low-level HTTPS helper ────────────────────────────────────────────────────
@@ -559,27 +509,48 @@ function doRequest(opts, body = null) {
 
 async function getJWT() {
   if (_jwt && Date.now() < _jwtExp) return _jwt;
-  console.log('  [Wazuh] Authenticating with manager API…');
+  console.log('  [Wazuh] Authenticating…');
 
   const creds = Buffer.from(`${WAZUH.username}:${WAZUH.password}`).toString('base64');
-  const r = await doRequest({
-    hostname: WAZUH.manager_host,
-    port:     DISCOVERED_MANAGER_PORT,
-    path:     '/security/user/authenticate?raw=true',
-    method:   'POST',
-    rejectUnauthorized: WAZUH.rejectUnauthorized,
-    headers:  { Authorization: `Basic ${creds}`, 'Content-Type': 'application/json' },
-  });
 
-  // ?raw=true returns the raw token string, not JSON
-  const token = typeof r.body === 'string' ? r.body.trim() : r.body?.data?.token;
-  if (!token || r.status !== 200) {
-    throw new Error(`Wazuh auth failed (HTTP ${r.status}): ${JSON.stringify(r.body).slice(0, 200)}`);
+  // Try both auth paths — Wazuh Manager API vs OpenSearch Dashboards
+  const authPaths = [
+    { path: '/security/user/authenticate?raw=true', method: 'POST', desc: 'Wazuh Manager API' },
+    { path: '/auth/login',                          method: 'POST', desc: 'OpenSearch Dashboards' },
+    { path: '/api/v1/auth/login',                   method: 'POST', desc: 'Wazuh Dashboard API v1' },
+  ];
+
+  for (const { path, method, desc } of authPaths) {
+    try {
+      const r = await doRequest({
+        hostname: WAZUH.manager_host,
+        port:     DISCOVERED_MANAGER_PORT,
+        path,
+        method,
+        rejectUnauthorized: WAZUH.rejectUnauthorized,
+        headers:  { Authorization: `Basic ${creds}`, 'Content-Type': 'application/json' },
+      });
+
+      console.log(`  [Wazuh]   ${desc} (${path}) → HTTP ${r.status} | body: ${JSON.stringify(r.raw || r.body).slice(0, 120)}`);
+
+      // Wazuh Manager API with ?raw=true → plain text token
+      if (r.status === 200 && typeof r.body === 'string' && r.body.length > 20) {
+        _jwt = r.body.trim(); _jwtExp = Date.now() + 14 * 60_000;
+        console.log(`  [Wazuh] ✓ Auth OK via ${desc}`);
+        return _jwt;
+      }
+      // Wazuh Manager API JSON response
+      if (r.status === 200 && r.body?.data?.token) {
+        _jwt = r.body.data.token; _jwtExp = Date.now() + 14 * 60_000;
+        console.log(`  [Wazuh] ✓ Auth OK via ${desc}`);
+        return _jwt;
+      }
+    } catch (e) {
+      console.log(`  [Wazuh]   ${desc} → error: ${e.message}`);
+    }
   }
-  _jwt    = token;
-  _jwtExp = Date.now() + 14 * 60_000;   // tokens last 15 min; refresh at 14
-  console.log('  [Wazuh] Auth OK ✓');
-  return _jwt;
+
+  throw new Error(`Wazuh auth failed on all paths. Check terminal for raw server responses above.`);
 }
 
 // ── Manager GET helper ────────────────────────────────────────────────────────
@@ -600,7 +571,6 @@ async function managerGet(path, ttl = TTL_MED) {
   });
 
   if (r.status === 401) {
-    // token expired mid-session — re-auth once
     _jwt = null;
     const t2 = await getJWT();
     r = await doRequest({
@@ -611,6 +581,12 @@ async function managerGet(path, ttl = TTL_MED) {
       rejectUnauthorized: WAZUH.rejectUnauthorized,
       headers:  { Authorization: `Bearer ${t2}`, Accept: 'application/json' },
     });
+  }
+
+  // 403 = permission denied for this user — return empty rather than crashing
+  if (r.status === 403) {
+    console.log(`  [Wazuh] Permission denied for ${path} — user lacks required role`);
+    return { data: { affected_items: [], total_affected_items: 0 }, _permissionDenied: true };
   }
 
   _cache[key] = { data: r.body, ts: now };
@@ -736,35 +712,42 @@ function handleWazuhRoutes(reqPath, url, res) {
   };
 
   // ── /wazuh/status  — quick connectivity test ──────────────────────────────
+  // Uses /agents (agents:read) instead of /manager/info (manager:read — may be restricted)
   if (sub === '/status' || sub === '/') {
     (async () => {
       try {
-        const [info, summary] = await Promise.all([
-          managerGet('/'),
-          managerGet('/agents/summary/status'),
-        ]);
-        ok({
-          connected: true,
-          manager:   info?.data || {},
-          agents:    summary?.data?.agent_status || {},
-        });
+        const agentsData = await managerGet('/agents?limit=1');
+        if (agentsData?.error) throw new Error(agentsData.message || JSON.stringify(agentsData));
+        ok({ connected: true, manager: { hostname: WAZUH.manager_host, version: '' }, agents: {} });
       } catch (e) { ok({ connected: false, error: e.message }); }
     })();
     return true;
   }
 
   // ── /wazuh/stats  — dashboard KPI summary ────────────────────────────────
+  // Avoids /manager/info (requires manager:read). Uses /agents + /alerts instead.
   if (sub === '/stats') {
     (async () => {
       try {
-        const [info, agSum, recentAlerts] = await Promise.all([
-          managerGet('/'),
-          managerGet('/agents/summary/status'),
+        // Fetch agents and alerts in parallel — both only need agents:read / events:read
+        const [agentsRaw, alertsRaw] = await Promise.all([
+          managerGet('/agents?limit=500&sort=-dateAdd').catch(() => null),
           managerGet('/alerts?limit=500&sort=-timestamp', TTL_SHORT).catch(() => null),
         ]);
 
+        // Derive agent counts from the list itself
+        const allAgents = (agentsRaw?.data?.affected_items || []).filter(a => a.id !== '000');
+        const agentStats = { active: 0, disconnected: 0, never_connected: 0, pending: 0, total: allAgents.length };
+        for (const a of allAgents) {
+          if      (a.status === 'active')          agentStats.active++;
+          else if (a.status === 'disconnected')    agentStats.disconnected++;
+          else if (a.status === 'never_connected') agentStats.never_connected++;
+          else if (a.status === 'pending')         agentStats.pending++;
+        }
+
+        // Derive alert counts from alert list
         const alertCount = { critical:0, high:0, medium:0, low:0, total:0 };
-        for (const a of (recentAlerts?.data?.affected_items || [])) {
+        for (const a of (alertsRaw?.data?.affected_items || [])) {
           const l = a.rule?.level || 0;
           alertCount.total++;
           if      (l >= 12) alertCount.critical++;
@@ -774,15 +757,11 @@ function handleWazuhRoutes(reqPath, url, res) {
         }
 
         ok({ data: {
-          manager: {
-            version:  info?.data?.api_version || info?.data?.version || '',
-            hostname: info?.data?.hostname || WAZUH.manager_host,
-            type:     'manager',
-          },
-          agents: agSum?.data?.agent_status || { active:0, disconnected:0, never_connected:0, pending:0, total:0 },
-          alerts: alertCount,
+          manager: { version: '', hostname: WAZUH.manager_host, type: 'manager' },
+          agents:  agentStats,
+          alerts:  alertCount,
         }});
-      } catch (e) { err(e); }
+      } catch (e) { ok({ data: [], total: 0, error: e.message }); }
     })();
     return true;
   }
@@ -794,7 +773,7 @@ function handleWazuhRoutes(reqPath, url, res) {
         const d     = await managerGet('/agents?limit=500&sort=-dateAdd');
         const items = (d?.data?.affected_items || []).filter(a => a.id !== '000');
         ok({ data: items.map(normAgent), total: items.length });
-      } catch (e) { err(e); }
+      } catch (e) { ok({ data: [], total: 0, error: e.message }); }
     })();
     return true;
   }
@@ -809,9 +788,10 @@ function handleWazuhRoutes(reqPath, url, res) {
           `/alerts?limit=${limit}&sort=-timestamp&q=rule.level>=${minLevel}`,
           TTL_SHORT
         );
+        if (d?._permissionDenied) { ok({ data: [], total: 0, _note: 'Permission denied — user needs events:read role' }); return; }
         const items = d?.data?.affected_items || [];
         ok({ data: items.map(normAlert), total: d?.data?.total_affected_items || 0 });
-      } catch (e) { err(e); }
+      } catch (e) { ok({ data: [], total: 0, error: e.message }); }
     })();
     return true;
   }
@@ -821,6 +801,7 @@ function handleWazuhRoutes(reqPath, url, res) {
     (async () => {
       try {
         const d     = await managerGet('/alerts?limit=500&sort=-timestamp&q=rule.level>=10', TTL_SHORT);
+        if (d?._permissionDenied) { ok({ data: [], total: 0 }); return; }
         const items = (d?.data?.affected_items || []).map(normAlert);
 
         // Deduplicate by rule_id; count occurrences and collect agents
@@ -859,7 +840,7 @@ function handleWazuhRoutes(reqPath, url, res) {
         })).sort((a, b) => b.count - a.count);
 
         ok({ data: threats, total: threats.length });
-      } catch (e) { err(e); }
+      } catch (e) { ok({ data: [], total: 0, error: e.message }); }
     })();
     return true;
   }
@@ -898,7 +879,7 @@ function handleWazuhRoutes(reqPath, url, res) {
         }, { Critical:0, High:0, Medium:0, Low:0 });
 
         ok({ data: vulns, total, stats });
-      } catch (e) { err(e); }
+      } catch (e) { ok({ data: [], total: 0, stats: {}, error: e.message }); }
     })();
     return true;
   }
@@ -908,6 +889,7 @@ function handleWazuhRoutes(reqPath, url, res) {
     (async () => {
       try {
         const d   = await managerGet('/alerts?limit=1000&sort=-timestamp&q=rule.level>=3', TTL_MED);
+        if (d?._permissionDenied) { ok({ data: [], total: 0 }); return; }
         const map = {};
 
         for (const a of (d?.data?.affected_items || [])) {
@@ -931,7 +913,7 @@ function handleWazuhRoutes(reqPath, url, res) {
           .sort((a, b) => b.count - a.count);
 
         ok({ data: result, total: result.length });
-      } catch (e) { err(e); }
+      } catch (e) { ok({ data: [], total: 0, error: e.message }); }
     })();
     return true;
   }
@@ -966,7 +948,7 @@ function handleWazuhRoutes(reqPath, url, res) {
         );
 
         ok({ data: results, total: results.length });
-      } catch (e) { err(e); }
+      } catch (e) { ok({ data: [], total: 0, error: e.message }); }
     })();
     return true;
   }
@@ -997,13 +979,13 @@ function handleWazuhRoutes(reqPath, url, res) {
       });
 
       // 1. Probe candidate manager ports
-      const mgPorts = [443, 55000, 4443];
+      const mgPorts = [55000];
       for (const port of mgPorts) {
         const r = await probe(WAZUH.manager_host, port, '/');
         results.manager[port] = {
           reachable: r.status > 0,
           status:    r.status,
-          isWazuh:   !!(r.body?.data?.title?.includes('Wazuh')),
+          isWazuh:   !!(r.body?.data?.title?.includes('Wazuh')) || r.status === 401,
           title:     r.body?.data?.title || '',
           version:   r.body?.data?.api_version || '',
           error:     r.error || null,
@@ -1019,7 +1001,7 @@ function handleWazuhRoutes(reqPath, url, res) {
       }
 
       // 2. Try auth on the working port
-      const workingMgPort = mgPorts.find(p => results.manager[p]?.isWazuh);
+      const workingMgPort = mgPorts.find(p => results.manager[p]?.isWazuh || results.manager[p]?.status === 401);
       if (workingMgPort) {
         const creds = Buffer.from(WAZUH.username + ':' + WAZUH.password).toString('base64');
         const authR = await probe(WAZUH.manager_host, workingMgPort,
@@ -1063,6 +1045,47 @@ function handleWazuhRoutes(reqPath, url, res) {
         ? 'Change manager_port to ' + workingMgPort + ' in threat-proxy.cjs'
         : workingMgPort ? 'manager_port is correct' : 'Cannot reach Wazuh — check host/firewall'
       }, null, 2));
+    })();
+    return true;
+  }
+
+  // ── /wazuh/raw-test — shows exact raw response from Wazuh for debugging ────
+  if (sub === '/raw-test') {
+    (async () => {
+      const creds = Buffer.from(`${WAZUH.username}:${WAZUH.password}`).toString('base64');
+      const paths = [
+        '/security/user/authenticate?raw=true',
+        '/security/user/authenticate',
+        '/',
+        '/api/v1/auth/login',
+      ];
+      const results = [];
+      for (const p of paths) {
+        try {
+          const r = await new Promise((resolve, reject) => {
+            const opts = {
+              hostname: WAZUH.manager_host,
+              port: DISCOVERED_MANAGER_PORT,
+              path: p, method: 'POST',
+              rejectUnauthorized: false,
+              headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/json' },
+            };
+            const req = https.request(opts, res => {
+              let raw = '';
+              res.on('data', c => raw += c);
+              res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, raw: raw.slice(0, 300) }));
+            });
+            req.setTimeout(5000, () => { req.destroy(); reject(new Error('timeout')); });
+            req.on('error', reject);
+            req.end();
+          });
+          results.push({ path: p, status: r.status, contentType: r.headers['content-type'], body: r.raw });
+        } catch (e) {
+          results.push({ path: p, error: e.message });
+        }
+      }
+      res.writeHead(200);
+      res.end(JSON.stringify({ host: WAZUH.manager_host, port: DISCOVERED_MANAGER_PORT, username: WAZUH.username, results }, null, 2));
     })();
     return true;
   }
@@ -1141,13 +1164,13 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`  http://localhost:${PORT}/threat-feeds     — Live threat intelligence`);
   console.log(`  http://localhost:${PORT}/cve-library      — CVE library browser`);
   console.log(`  http://localhost:${PORT}/cve-library?search=apache&severity=Critical`);
-  console.log('  http://localhost:${PORT}/wazuh/stats        — Wazuh connection status');
-  console.log('  http://localhost:${PORT}/wazuh/agents       — Asset inventory');
-  console.log('  http://localhost:${PORT}/wazuh/threats      — Threat intelligence');
-  console.log('  http://localhost:${PORT}/wazuh/alerts       — Security events');
-  console.log('  http://localhost:${PORT}/wazuh/vulnerabilities — Vulnerability data');
-  console.log('  http://localhost:${PORT}/wazuh/mitre        — MITRE ATT\u0026CK map');
-  console.log('  http://localhost:${PORT}/wazuh/sca          — Config assessment');
+  console.log(`  http://localhost:${PORT}/wazuh/stats        — Wazuh connection status`);
+  console.log(`  http://localhost:${PORT}/wazuh/agents       — Asset inventory`);
+  console.log(`  http://localhost:${PORT}/wazuh/threats      — Threat intelligence`);
+  console.log(`  http://localhost:${PORT}/wazuh/alerts       — Security events`);
+  console.log(`  http://localhost:${PORT}/wazuh/vulnerabilities — Vulnerability data`);
+  console.log(`  http://localhost:${PORT}/wazuh/mitre        — MITRE ATT&CK map`);
+  console.log(`  http://localhost:${PORT}/wazuh/sca          — Config assessment`);
   console.log('Sources  : IPsum · MISP Galaxy · GitHub CVEProject · Wazuh SIEM');
   console.log(`Cache TTL: ${CACHE_TTL / 1000}s (CVE: 30min)\n`);
 });

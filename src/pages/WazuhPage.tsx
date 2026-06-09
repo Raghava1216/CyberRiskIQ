@@ -99,13 +99,17 @@ function useWazuh<T>(endpoint: string, enabled = true) {
     setLoading(true); setError(null);
     try {
       const r = await fetch(`${PROXY}${endpoint}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
-      if (!j.success) throw new Error(j.error || 'Wazuh error');
-      setData(j.data ?? j);
-      setTs(new Date());
+      // Always parse JSON — proxy now returns 200 with empty data on permission errors
+      const j = await r.json().catch(() => ({ success: false, data: [], error: `HTTP ${r.status}` }));
+      if (!j.success && j.error && !j.data) {
+        setError(j.error);
+      } else {
+        // Use data even if success=false — may have partial data or empty array
+        setData((j.data ?? j) as T);
+        setTs(new Date());
+      }
     } catch (e) {
-      setError((e as Error).message);
+      setError((e as Error).message.includes('fetch') ? 'Proxy not running — start: node threat-proxy.cjs' : (e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -287,10 +291,10 @@ export default function WazuhPage() {
               <div className="text-xs text-slate-400 space-y-1.5 pt-1">
                 <p className="font-medium text-slate-300">How to fix:</p>
                 <div className="space-y-1 ml-2">
-                  <p>① The API is responding — HTTP 401 means <strong className="text-amber-300">wrong username or password</strong></p>
-                  <p>② Update <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">username</code> and <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">password</code> in <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">threat-proxy.cjs</code> → WAZUH block</p>
-                  <p>③ API credentials ≠ dashboard login. Find them: Wazuh → <strong>Server Management → Settings → API</strong></p>
-                  <p>④ To reset on the Wazuh server: <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">sudo /var/ossec/bin/wazuh-keystore -f indexer -k username</code></p>
+                  <p>① Credentials are correct — the issue is <strong className="text-amber-300">user permissions</strong></p>
+                  <p>② User <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">pramod</code> needs the <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">agents_admin</code> or <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">readonly</code> role in Wazuh</p>
+                  <p>③ Ask your Wazuh admin: <em>Server Management → Security → Users → pramod → assign role</em></p>
+                  <p>④ Minimum roles needed: <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">agents_admin</code> + <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">events_reader</code></p>
                 </div>
               </div>
 

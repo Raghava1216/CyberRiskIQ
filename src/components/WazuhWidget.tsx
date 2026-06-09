@@ -73,10 +73,13 @@ export default function WazuhWidget({ mode, onDataLoad, compact = false }: Wazuh
 
     try {
       const statsRes = await fetch(`${PROXY}/wazuh/stats`);
-      if (!statsRes.ok) throw new Error(`Proxy error HTTP ${statsRes.status} — run: node threat-proxy.cjs`);
-      const statsJson = await statsRes.json();
+      // Proxy always returns 200 now — even on permission errors
+      if (statsRes.status !== 200 && statsRes.status !== undefined) {
+        throw new Error(`Proxy not running (HTTP ${statsRes.status}) — run: node threat-proxy.cjs`);
+      }
+      const statsJson = await statsRes.json().catch(() => ({ success: false, error: 'Invalid response from proxy' }));
 
-      if (!statsJson.success) {
+      if (!statsJson.success && !statsJson.data) {
         setConnected(false);
         setError(statsJson.error || 'Wazuh API unreachable');
         return;
