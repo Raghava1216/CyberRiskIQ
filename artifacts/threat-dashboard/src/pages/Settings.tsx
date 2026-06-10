@@ -1,105 +1,65 @@
-import { useState, useEffect } from 'react';
-import {
-  Shield, Save, RefreshCw, CheckCircle2, AlertTriangle,
-  Eye, EyeOff, ExternalLink, Wifi, WifiOff, Server,
-  Activity, Zap, Database, Lock, Globe, Info,
-} from 'lucide-react';
+import { useState } from 'react';
+import { Shield, Save, RefreshCw, CheckCircle, AlertTriangle, Eye, EyeOff, ExternalLink, Server, Activity, Zap, Database, Lock, Globe, Info } from 'react-feather';
+import { Card, Row, Col, Nav, Form } from 'react-bootstrap';
 
 const PROXY = 'http://localhost:3001';
-
-// Stored in localStorage so settings persist across sessions
 const STORAGE_KEY = 'cyberriskiq_wazuh_config';
 
 interface WazuhConfig {
-  host:     string;
-  port:     string;
-  username: string;
-  password: string;
-  enabled:  boolean;
+  host: string; port: string; username: string; password: string; enabled: boolean;
 }
 
 function loadConfig(): WazuhConfig {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return {
-    host:     '192.168.1.212',
-    port:     '443',
-    username: 'wazuh',
-    password: '',
-    enabled:  false,
-  };
+  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); } catch {}
+  return { host: '192.168.1.212', port: '443', username: 'wazuh', password: '', enabled: false };
 }
 
-function saveConfig(cfg: WazuhConfig) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
-}
+function saveConfig(cfg: WazuhConfig) { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
 
 interface ConnectionStatus {
   state:    'idle' | 'testing' | 'success' | 'error';
-  message:  string;
-  manager?: string;
-  agents?:  number;
-  version?: string;
+  message:  string; manager?: string; agents?: number; version?: string;
+}
+
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div onClick={() => onChange(!on)} style={{ position: 'relative', width: 40, height: 22, borderRadius: 11, background: on ? '#3B82EC' : '#d0d5dd', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
+      <div style={{ position: 'absolute', top: 3, left: on ? 20 : 3, width: 16, height: 16, background: '#fff', borderRadius: '50%', boxShadow: '0 1px 3px rgba(0,0,0,.2)', transition: 'left 0.2s' }} />
+    </div>
+  );
 }
 
 export default function Settings() {
-  const [config,      setConfig]      = useState<WazuhConfig>(loadConfig);
-  const [showPass,    setShowPass]    = useState(false);
-  const [conn,        setConn]        = useState<ConnectionStatus>({ state: 'idle', message: '' });
-  const [saved,       setSaved]       = useState(false);
-  const [activeTab,   setActiveTab]   = useState<'wazuh' | 'general' | 'notifications'>('wazuh');
+  const [config,    setConfig]    = useState<WazuhConfig>(loadConfig);
+  const [showPass,  setShowPass]  = useState(false);
+  const [conn,      setConn]      = useState<ConnectionStatus>({ state: 'idle', message: '' });
+  const [saved,     setSaved]     = useState(false);
+  const [activeTab, setActiveTab] = useState<'wazuh' | 'general' | 'notifications'>('wazuh');
 
-  const set = <K extends keyof WazuhConfig>(key: K, val: WazuhConfig[K]) =>
-    setConfig(c => ({ ...c, [key]: val }));
+  const set = <K extends keyof WazuhConfig>(key: K, val: WazuhConfig[K]) => setConfig(c => ({ ...c, [key]: val }));
 
-  const handleSave = () => {
-    saveConfig(config);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
+  const handleSave = () => { saveConfig(config); setSaved(true); setTimeout(() => setSaved(false), 3000); };
 
   const testConnection = async () => {
     setConn({ state: 'testing', message: 'Running port probe and auth test…' });
     try {
-      // First run diagnostics to get clear port/auth info
-      const diagRes  = await fetch(`${PROXY}/wazuh/diagnose`);
+      const diagRes = await fetch(`${PROXY}/wazuh/diagnose`);
       if (!diagRes.ok) throw new Error(`Proxy not running (HTTP ${diagRes.status}). Start it: node threat-proxy.cjs`);
       const diagJson = await diagRes.json();
       const summary  = diagJson.results?.summary || [];
       const fix      = diagJson.fix || '';
-
-      // Check if auth succeeded
-      const authOk = diagJson.results?.auth?.success;
+      const authOk   = diagJson.results?.auth?.success;
       if (!authOk) {
-        const authErr = summary.find((s: string) => s.includes('credentials') || s.includes('401') || s.includes('cannot reach') || s.includes('Cannot reach'));
-        setConn({
-          state:   'error',
-          message: (authErr || fix || summary.join(' | ') || 'Could not authenticate with Wazuh'),
-        });
+        const authErr = summary.find((s: string) => s.includes('credentials') || s.includes('401') || s.includes('cannot reach'));
+        setConn({ state: 'error', message: authErr || fix || summary.join(' | ') || 'Could not authenticate with Wazuh' });
         return;
       }
-
-      // Auth worked — now get actual stats
       const statsRes  = await fetch(`${PROXY}/wazuh/stats`);
       const statsJson = await statsRes.json();
-
-      setConn({
-        state:   'success',
-        message: fix || 'Connected successfully',
-        manager: statsJson.data?.manager?.hostname || config.host,
-        agents:  statsJson.data?.agents?.active || 0,
-        version: statsJson.data?.manager?.version || diagJson.results?.manager?.[diagJson.results?.auth?.port]?.version || '',
-      });
+      setConn({ state: 'success', message: fix || 'Connected successfully', manager: statsJson.data?.manager?.hostname || config.host, agents: statsJson.data?.agents?.active || 0, version: statsJson.data?.manager?.version || '' });
     } catch (err) {
       const msg = (err as Error).message;
-      setConn({
-        state:   'error',
-        message: msg.includes('fetch') || msg.includes('Failed')
-          ? 'Cannot reach proxy. Run: node threat-proxy.cjs in your project directory.'
-          : msg,
-      });
+      setConn({ state: 'error', message: msg.includes('fetch') || msg.includes('Failed') ? 'Cannot reach proxy. Run: node threat-proxy.cjs in your project directory.' : msg });
     }
   };
 
@@ -110,320 +70,257 @@ export default function Settings() {
   ] as const;
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-4xl">
+    <div className="progrec-page p-4 p-lg-5">
+      <div style={{ maxWidth: 800 }}>
 
-      {/* Header */}
-      <div>
-        <h2 className="text-slate-100 font-bold text-xl">Platform Settings</h2>
-        <p className="text-slate-500 text-sm">Configure integrations, connections and platform preferences</p>
-      </div>
+        {/* Header */}
+        <div className="mb-4">
+          <h5 className="fw-bold mb-0" style={{ color: '#101828' }}>Platform Settings</h5>
+          <span style={{ fontSize: '0.82rem', color: '#667085' }}>Configure integrations, connections and platform preferences</span>
+        </div>
 
-      {/* Tab nav */}
-      <div className="flex border-b border-slate-700 gap-1">
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === t.id
-                ? 'border-cyan-500 text-cyan-400'
-                : 'border-transparent text-slate-500 hover:text-slate-300'
-            }`}>
-            <t.icon size={15} />{t.label}
-          </button>
-        ))}
-      </div>
+        {/* Tab nav */}
+        <div className="mb-4" style={{ borderBottom: '1px solid #e4e7ec' }}>
+          <Nav variant="tabs" className="border-0">
+            {TABS.map(t => (
+              <Nav.Item key={t.id}>
+                <Nav.Link active={activeTab === t.id} onClick={() => setActiveTab(t.id)}
+                  className="d-flex align-items-center gap-2"
+                  style={{ fontSize: '0.82rem', fontFamily: 'Poppins,sans-serif', cursor: 'pointer', color: activeTab === t.id ? '#3B82EC' : '#667085' }}>
+                  <t.icon size={14} /> {t.label}
+                </Nav.Link>
+              </Nav.Item>
+            ))}
+          </Nav>
+        </div>
 
-      {/* ── Wazuh Tab ─────────────────────────────────────────────────────── */}
-      {activeTab === 'wazuh' && (
-        <div className="space-y-6">
+        {/* Wazuh Tab */}
+        {activeTab === 'wazuh' && (
+          <div className="d-flex flex-column gap-4">
 
-          {/* Info banner */}
-          <div className="flex items-start gap-3 bg-cyan-500/8 border border-cyan-500/20 rounded-xl p-4 text-sm">
-            <Info size={15} className="text-cyan-400 flex-shrink-0 mt-0.5" />
-            <div className="text-slate-400 text-xs leading-relaxed space-y-1">
-              <p>CyberRiskIQ connects to Wazuh through the local proxy (<code className="text-cyan-400">threat-proxy.cjs</code>).</p>
-              <p>The proxy handles authentication and HTTPS certificate bypass for internal networks.</p>
-              <p className="text-slate-500">
-                To update credentials: edit <code className="text-cyan-400">WAZUH_CONFIG</code> in <code className="text-cyan-400">threat-proxy.cjs</code>, then restart the proxy.
-              </p>
-            </div>
-          </div>
-
-          {/* Connection config card */}
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/15 flex items-center justify-center">
-                  <Shield size={16} className="text-cyan-400" />
-                </div>
-                <div>
-                  <h3 className="text-slate-100 font-semibold text-sm">Wazuh API Connection</h3>
-                  <p className="text-slate-500 text-xs">API on port 443</p>
-                </div>
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-xs text-slate-400">Enable Integration</span>
-                <div
-                  onClick={() => set('enabled', !config.enabled)}
-                  className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${config.enabled ? 'bg-cyan-500' : 'bg-slate-600'}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${config.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </div>
-              </label>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {/* Host + Port */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <Globe size={12} /> Wazuh Host / IP
-                  </label>
-                  <input
-                    value={config.host}
-                    onChange={e => set('host', e.target.value)}
-                    placeholder="192.168.1.212"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyan-500 transition-colors font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 block">Port</label>
-                  <input
-                    value={config.port}
-                    onChange={e => set('port', e.target.value)}
-                    placeholder="443"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyan-500 transition-colors font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Manager API Credentials */}
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest pt-1">Manager API (port 443)</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <Lock size={12} /> API Username
-                  </label>
-                  <input
-                    value={config.username}
-                    onChange={e => set('username', e.target.value)}
-                    placeholder="wazuh"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyan-500 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <Lock size={12} /> API Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPass ? 'text' : 'password'}
-                      value={config.password}
-                      onChange={e => set('password', e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 pr-10 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyan-500 transition-colors"
-                    />
-                    <button
-                      onClick={() => setShowPass(s => !s)}
-                      className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 transition-colors"
-                    >
-                      {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Indexer credentials — needed for vulnerabilities (4.8+) */}
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest pt-2">Indexer API (port 9200) — Vulnerabilities</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <Database size={12} /> Indexer Username
-                  </label>
-                  <input
-                    defaultValue="admin"
-                    placeholder="admin"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyan-500 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <Lock size={12} /> Indexer Password
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 outline-none focus:border-cyan-500 transition-colors"
-                  />
-                </div>
-              </div>
-              <div className="bg-blue-500/8 border border-blue-500/15 rounded-lg px-4 py-2.5 text-xs text-blue-400/80 leading-relaxed">
-                <strong className="text-blue-400">Wazuh 4.8+:</strong> Vulnerabilities moved from the Manager API to the Wazuh Indexer (OpenSearch at port 9200). The indexer uses separate admin credentials — usually <code className="bg-slate-800 px-1">admin</code> / the password set during Wazuh installation.
-              </div>
-
-              {/* Important note */}
-              <div className="space-y-2">
-                <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-4 py-3 text-xs text-amber-400/80 leading-relaxed space-y-1.5">
-                  <p>The API runs on port <strong className="text-amber-300">443</strong> — no port number needed in the URL, same as the dashboard.</p>
-                  <p><strong className="text-amber-300">These are NOT your dashboard login.</strong> Find the API user in Wazuh:<br/>
-                  <em>Server Management → Settings → API</em> — the username is shown there.</p>
-                  <p>To find/reset the password on your Wazuh server terminal:<br/>
-                  <code className="bg-slate-800 text-cyan-400 px-1.5 py-0.5 rounded">sudo cat /etc/wazuh-indexer/opensearch.yml</code><br/>
-                  or use the Wazuh password tool to reset all credentials.</p>
-                </div>
-                <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-4 py-3 text-xs text-amber-400/80 leading-relaxed">
-                  <strong className="text-amber-400">After any change:</strong> Update <code className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400">WAZUH</code> in <code className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400">threat-proxy.cjs</code> and restart: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-cyan-400">node threat-proxy.cjs</code>
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex items-center gap-3 pt-2">
-                <button onClick={testConnection} disabled={conn.state === 'testing'}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 text-sm font-medium transition-colors disabled:opacity-50">
-                  <RefreshCw size={14} className={conn.state === 'testing' ? 'animate-spin' : ''} />
-                  {conn.state === 'testing' ? 'Testing…' : 'Test Connection'}
-                </button>
-                <button onClick={handleSave}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 text-sm font-semibold transition-colors">
-                  {saved ? <CheckCircle2 size={14} /> : <Save size={14} />}
-                  {saved ? 'Saved!' : 'Save Settings'}
-                </button>
-                <a href="https://192.168.1.212" target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 text-sm transition-colors">
-                  <ExternalLink size={13} /> Open Wazuh
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Connection result */}
-          {conn.state !== 'idle' && (
-            <div className={`flex items-start gap-3 rounded-xl p-4 border text-sm ${
-              conn.state === 'testing' ? 'bg-slate-800/50 border-slate-700/50' :
-              conn.state === 'success' ? 'bg-emerald-500/10 border-emerald-500/20' :
-              'bg-red-500/10 border-red-500/20'
-            }`}>
-              {conn.state === 'testing' && <RefreshCw size={16} className="animate-spin text-slate-400 mt-0.5 flex-shrink-0" />}
-              {conn.state === 'success' && <CheckCircle2 size={16} className="text-emerald-400 mt-0.5 flex-shrink-0" />}
-              {conn.state === 'error'   && <AlertTriangle size={16} className="text-red-400 mt-0.5 flex-shrink-0" />}
+            {/* Info banner */}
+            <div className="d-flex align-items-start gap-3 p-3 rounded" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: '0.78rem', color: '#344054', lineHeight: 1.7 }}>
+              <Info size={14} color="#3B82EC" style={{ flexShrink: 0, marginTop: 2 }} />
               <div>
-                <p className={`font-medium ${
-                  conn.state === 'success' ? 'text-emerald-300' :
-                  conn.state === 'error'   ? 'text-red-300'     : 'text-slate-300'
-                }`}>
-                  {conn.state === 'success' ? 'Wazuh Connected' :
-                   conn.state === 'error'   ? 'Connection Failed' : 'Testing…'}
-                </p>
-                <p className="text-xs mt-0.5 text-slate-400">{conn.message}</p>
-                {conn.state === 'success' && (
-                  <div className="flex gap-4 mt-2 text-xs text-slate-400">
-                    {conn.manager && <span><Server size={11} className="inline mr-1" />{conn.manager}</span>}
-                    {conn.version && <span>v{conn.version}</span>}
-                    {conn.agents !== undefined && <span className="text-emerald-400">{conn.agents} active agents</span>}
-                  </div>
-                )}
+                <p className="mb-1">CyberRiskIQ connects to Wazuh through the local proxy (<code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4, color: '#3B82EC' }}>threat-proxy.cjs</code>).</p>
+                <p className="mb-1">The proxy handles authentication and HTTPS certificate bypass for internal networks.</p>
+                <p className="mb-0" style={{ color: '#667085' }}>To update credentials: edit <code style={{ background: '#fff', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>WAZUH_CONFIG</code> in <code style={{ background: '#fff', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>threat-proxy.cjs</code>, then restart.</p>
               </div>
             </div>
-          )}
 
-          {/* Data integration map */}
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-            <h4 className="text-slate-300 font-medium text-sm mb-4">Data Integration Map</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                { wazuh: 'Security Alerts (level ≥ 10)',  app: 'Threat Intelligence',   icon: Activity, color: 'text-red-400',     status: 'auto' },
-                { wazuh: 'Monitored Agents',              app: 'Asset Inventory',        icon: Server,   color: 'text-cyan-400',    status: 'auto' },
-                { wazuh: 'Vulnerability Module',          app: 'Vulnerability Register', icon: Zap,      color: 'text-orange-400',  status: 'manual' },
-                { wazuh: 'MITRE ATT&CK Mappings',        app: 'Threat Intelligence',    icon: Shield,   color: 'text-purple-400',  status: 'auto' },
-                { wazuh: 'SCA Policies',                  app: 'Compliance',             icon: CheckCircle2, color: 'text-emerald-400', status: 'coming' },
-                { wazuh: 'Manager Stats',                 app: 'Dashboard KPIs',         icon: Activity, color: 'text-blue-400',    status: 'auto' },
-              ].map(item => (
-                <div key={item.wazuh} className="flex items-center gap-3 bg-slate-900/50 rounded-lg px-3 py-2.5">
-                  <item.icon size={14} className={item.color} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-slate-300 text-xs font-medium truncate">{item.wazuh}</p>
-                    <p className="text-slate-600 text-xs">→ {item.app}</p>
+            {/* Connection config */}
+            <Card className="shadow-sm border-0" style={{ borderRadius: 10, overflow: 'hidden' }}>
+              <Card.Header className="bg-white d-flex align-items-center justify-content-between px-4 py-3" style={{ borderBottom: '1px solid #e4e7ec' }}>
+                <div className="d-flex align-items-center gap-2">
+                  <div className="d-flex align-items-center justify-content-center rounded" style={{ width: 32, height: 32, background: '#eff6ff' }}>
+                    <Shield size={15} color="#3B82EC" />
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded border ${
-                    item.status === 'auto'   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                    item.status === 'manual' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'       :
-                    'bg-slate-700/50 text-slate-500 border-slate-600'
-                  }`}>
-                    {item.status === 'auto' ? 'Live' : item.status === 'manual' ? 'On-demand' : 'Soon'}
-                  </span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#101828' }}>Wazuh API Connection</div>
+                    <div style={{ fontSize: '0.72rem', color: '#98a2b3' }}>API on port 443</div>
+                  </div>
                 </div>
-              ))}
+                <label className="d-flex align-items-center gap-2" style={{ cursor: 'pointer', fontSize: '0.78rem', color: '#667085' }}>
+                  Enable Integration
+                  <Toggle on={config.enabled} onChange={v => set('enabled', v)} />
+                </label>
+              </Card.Header>
+              <Card.Body className="p-4">
+
+                {/* Host + Port */}
+                <Row className="g-3 mb-3">
+                  <Col xs={8}>
+                    <Form.Label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#667085', textTransform: 'uppercase', letterSpacing: '0.04em' }} className="d-flex align-items-center gap-1 mb-1">
+                      <Globe size={11} /> Wazuh Host / IP
+                    </Form.Label>
+                    <Form.Control value={config.host} onChange={e => set('host', e.target.value)} placeholder="192.168.1.212" style={{ fontSize: '0.82rem', fontFamily: 'monospace' }} />
+                  </Col>
+                  <Col xs={4}>
+                    <Form.Label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#667085', textTransform: 'uppercase', letterSpacing: '0.04em' }} className="mb-1">Port</Form.Label>
+                    <Form.Control value={config.port} onChange={e => set('port', e.target.value)} placeholder="443" style={{ fontSize: '0.82rem', fontFamily: 'monospace' }} />
+                  </Col>
+                </Row>
+
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#98a2b3', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Manager API (port 443)</div>
+                <Row className="g-3 mb-4">
+                  <Col xs={6}>
+                    <Form.Label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#667085', textTransform: 'uppercase', letterSpacing: '0.04em' }} className="d-flex align-items-center gap-1 mb-1"><Lock size={11} /> API Username</Form.Label>
+                    <Form.Control value={config.username} onChange={e => set('username', e.target.value)} placeholder="wazuh" style={{ fontSize: '0.82rem' }} />
+                  </Col>
+                  <Col xs={6}>
+                    <Form.Label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#667085', textTransform: 'uppercase', letterSpacing: '0.04em' }} className="d-flex align-items-center gap-1 mb-1"><Lock size={11} /> API Password</Form.Label>
+                    <div style={{ position: 'relative' }}>
+                      <Form.Control type={showPass ? 'text' : 'password'} value={config.password} onChange={e => set('password', e.target.value)} placeholder="••••••••" style={{ fontSize: '0.82rem', paddingRight: 36 }} />
+                      <button onClick={() => setShowPass(s => !s)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: '#98a2b3' }}>
+                        {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </Col>
+                </Row>
+
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#98a2b3', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 12 }}>Indexer API (port 9200) — Vulnerabilities</div>
+                <Row className="g-3 mb-4">
+                  <Col xs={6}>
+                    <Form.Label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#667085', textTransform: 'uppercase', letterSpacing: '0.04em' }} className="d-flex align-items-center gap-1 mb-1"><Database size={11} /> Indexer Username</Form.Label>
+                    <Form.Control defaultValue="admin" placeholder="admin" style={{ fontSize: '0.82rem' }} />
+                  </Col>
+                  <Col xs={6}>
+                    <Form.Label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#667085', textTransform: 'uppercase', letterSpacing: '0.04em' }} className="d-flex align-items-center gap-1 mb-1"><Lock size={11} /> Indexer Password</Form.Label>
+                    <Form.Control type="password" placeholder="••••••••" style={{ fontSize: '0.82rem' }} />
+                  </Col>
+                </Row>
+
+                <div className="mb-4 p-3 rounded" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: '0.75rem', color: '#344054' }}>
+                  <strong style={{ color: '#3B82EC' }}>Wazuh 4.8+:</strong> Vulnerabilities moved from the Manager API to the Wazuh Indexer (OpenSearch at port 9200). The indexer uses separate admin credentials.
+                </div>
+                <div className="p-3 rounded mb-4" style={{ background: '#fffbeb', border: '1px solid #fde68a', fontSize: '0.75rem', color: '#667085' }}>
+                  <strong style={{ color: '#f0ad4e' }}>After any change:</strong> Update <code style={{ background: '#f4f7f9', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>WAZUH</code> in <code style={{ background: '#f4f7f9', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>threat-proxy.cjs</code> and restart: <code style={{ background: '#f4f7f9', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>node threat-proxy.cjs</code>
+                </div>
+
+                {/* Action buttons */}
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  <button onClick={testConnection} disabled={conn.state === 'testing'} className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2">
+                    <RefreshCw size={13} className={conn.state === 'testing' ? 'spin' : ''} />
+                    {conn.state === 'testing' ? 'Testing…' : 'Test Connection'}
+                  </button>
+                  <button onClick={handleSave} className="btn btn-primary btn-sm d-flex align-items-center gap-2">
+                    {saved ? <CheckCircle size={13} /> : <Save size={13} />}
+                    {saved ? 'Saved!' : 'Save Settings'}
+                  </button>
+                  <a href="https://192.168.1.212" target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2">
+                    <ExternalLink size={13} /> Open Wazuh
+                  </a>
+                </div>
+              </Card.Body>
+            </Card>
+
+            {/* Connection result */}
+            {conn.state !== 'idle' && (
+              <div className="d-flex align-items-start gap-3 p-4 rounded" style={{
+                background: conn.state === 'success' ? '#f0fdf4' : conn.state === 'error' ? '#fff5f5' : '#f9fafb',
+                border: `1px solid ${conn.state === 'success' ? '#bbf7d0' : conn.state === 'error' ? '#fecaca' : '#e4e7ec'}`,
+                fontSize: '0.82rem',
+              }}>
+                {conn.state === 'testing' && <RefreshCw size={16} className="spin" color="#98a2b3" />}
+                {conn.state === 'success' && <CheckCircle size={16} color="#4BBF73" />}
+                {conn.state === 'error'   && <AlertTriangle size={16} color="#d9534f" />}
+                <div>
+                  <div style={{ fontWeight: 600, color: conn.state === 'success' ? '#4BBF73' : conn.state === 'error' ? '#d9534f' : '#667085', marginBottom: 4 }}>
+                    {conn.state === 'success' ? 'Wazuh Connected' : conn.state === 'error' ? 'Connection Failed' : 'Testing…'}
+                  </div>
+                  <div style={{ color: '#667085', fontSize: '0.78rem' }}>{conn.message}</div>
+                  {conn.state === 'success' && (
+                    <div className="d-flex gap-3 mt-2" style={{ fontSize: '0.75rem', color: '#98a2b3' }}>
+                      {conn.manager && <span className="d-flex align-items-center gap-1"><Server size={11} />{conn.manager}</span>}
+                      {conn.version && <span>v{conn.version}</span>}
+                      {conn.agents !== undefined && <span style={{ color: '#4BBF73' }}>{conn.agents} active agents</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Data integration map */}
+            <Card className="shadow-sm border-0" style={{ borderRadius: 10 }}>
+              <Card.Body className="p-4">
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#101828', marginBottom: 16 }}>Data Integration Map</div>
+                <div className="row g-2">
+                  {[
+                    { wazuh: 'Security Alerts (level ≥ 10)',  app: 'Threat Intelligence',   icon: Activity, color: '#d9534f', status: 'auto'   },
+                    { wazuh: 'Monitored Agents',              app: 'Asset Inventory',        icon: Server,   color: '#3B82EC', status: 'auto'   },
+                    { wazuh: 'Vulnerability Module',          app: 'Vulnerability Register', icon: Zap,      color: '#fd7e14', status: 'manual' },
+                    { wazuh: 'MITRE ATT&CK Mappings',        app: 'Threat Intelligence',    icon: Shield,   color: '#6f42c1', status: 'auto'   },
+                    { wazuh: 'SCA Policies',                  app: 'Compliance',             icon: CheckCircle, color: '#4BBF73', status: 'coming' },
+                    { wazuh: 'Manager Stats',                 app: 'Dashboard KPIs',         icon: Activity, color: '#3B82EC', status: 'auto'   },
+                  ].map(item => (
+                    <div key={item.wazuh} className="col-12 col-md-6">
+                      <div className="d-flex align-items-center gap-2 p-2 rounded" style={{ background: '#f9fafb', border: '1px solid #e4e7ec' }}>
+                        <item.icon size={13} color={item.color} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 500, color: '#344054', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.wazuh}</div>
+                          <div style={{ fontSize: '0.68rem', color: '#98a2b3' }}>→ {item.app}</div>
+                        </div>
+                        <span style={{ fontSize: '0.68rem', padding: '1px 7px', borderRadius: 20, fontWeight: 500, background: item.status === 'auto' ? '#f0fdf4' : item.status === 'manual' ? '#fffbeb' : '#f9fafb', color: item.status === 'auto' ? '#4BBF73' : item.status === 'manual' ? '#f0ad4e' : '#98a2b3', border: `1px solid ${item.status === 'auto' ? '#bbf7d0' : item.status === 'manual' ? '#fde68a' : '#e4e7ec'}` }}>
+                          {item.status === 'auto' ? 'Live' : item.status === 'manual' ? 'On-demand' : 'Soon'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card.Body>
+            </Card>
+
+            {/* Setup guide */}
+            <Card className="shadow-sm border-0" style={{ borderRadius: 10 }}>
+              <Card.Body className="p-4">
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#101828', marginBottom: 14 }}>Quick Setup Guide</div>
+                <ol className="ps-0 mb-0" style={{ listStyle: 'none' }}>
+                  {[
+                    'Open threat-proxy.cjs and find the WAZUH config block near the top',
+                    'Set manager credentials: username / password (used for JWT auth at port 443)',
+                    'Set indexer credentials: indexer_user / indexer_pass (admin at port 9200 — vulnerabilities)',
+                    'Run: node threat-proxy.cjs in a terminal and keep it running',
+                    'Click "Test Connection" above — it will confirm manager API connectivity',
+                    'Navigate to Wazuh SIEM in the sidebar — all three tabs load simultaneously',
+                  ].map((text, i) => (
+                    <li key={i} className="d-flex align-items-start gap-3 mb-2">
+                      <span className="d-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style={{ width: 20, height: 20, background: '#eff6ff', color: '#3B82EC', fontSize: '0.68rem', fontWeight: 700, marginTop: 1 }}>{i + 1}</span>
+                      <span style={{ fontSize: '0.78rem', color: '#667085', lineHeight: 1.6 }}>{text}</span>
+                    </li>
+                  ))}
+                </ol>
+              </Card.Body>
+            </Card>
+          </div>
+        )}
+
+        {/* General Tab */}
+        {activeTab === 'general' && (
+          <div className="d-flex flex-column gap-4">
+            <Card className="shadow-sm border-0" style={{ borderRadius: 10 }}>
+              <Card.Body className="p-4 d-flex flex-column gap-3">
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#101828', marginBottom: 4 }}>Platform Preferences</div>
+                {[
+                  { label: 'Organisation Name',    key: 'org',      val: 'Acme Financial Corp' },
+                  { label: 'Default Risk Appetite', key: 'appetite', val: 'Low'                },
+                  { label: 'Reporting Currency',    key: 'currency', val: 'USD'                },
+                ].map(f => (
+                  <div key={f.key}>
+                    <Form.Label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#667085', textTransform: 'uppercase', letterSpacing: '0.04em' }} className="mb-1">{f.label}</Form.Label>
+                    <Form.Control defaultValue={f.val} style={{ fontSize: '0.82rem' }} />
+                  </div>
+                ))}
+              </Card.Body>
+            </Card>
+            <div className="d-flex justify-content-end">
+              <button className="btn btn-primary btn-sm d-flex align-items-center gap-2"><Save size={13} /> Save</button>
             </div>
           </div>
+        )}
 
-          {/* Quick setup guide */}
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-            <h4 className="text-slate-300 font-medium text-sm mb-3">Quick Setup Guide</h4>
-            <ol className="space-y-2.5 text-xs text-slate-400">
-              {[
-                { step: '1', text: 'Open threat-proxy.cjs and find the WAZUH config block near the top' },
-                { step: '2', text: 'Set manager credentials: username / password (used for JWT auth at port 443)' },
-                { step: '3', text: 'Set indexer credentials: indexer_user / indexer_pass (admin at port 9200 — needed for vulnerabilities)' },
-                { step: '4', text: 'Run: node threat-proxy.cjs in a terminal and keep it running' },
-                { step: '5', text: 'Click "Test Connection" above — it will confirm manager API connectivity' },
-                { step: '6', text: 'Navigate to Wazuh SIEM in the sidebar — all three tabs load simultaneously' },
-              ].map(s => (
-                <li key={s.step} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-cyan-500/15 text-cyan-400 flex items-center justify-center font-bold text-xs">{s.step}</span>
-                  <span className="leading-relaxed">{s.text}</span>
-                </li>
-              ))}
-            </ol>
+        {/* Notifications Tab */}
+        {activeTab === 'notifications' && (
+          <div className="d-flex flex-column gap-4">
+            <Card className="shadow-sm border-0" style={{ borderRadius: 10 }}>
+              <Card.Body className="p-4 d-flex flex-column gap-3">
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#101828', marginBottom: 4 }}>Alert Thresholds</div>
+                {[
+                  { label: 'Notify on Critical risks',        on: true  },
+                  { label: 'Notify on new DORA incidents',    on: true  },
+                  { label: 'Notify on Wazuh critical alerts', on: true  },
+                  { label: 'Notify on compliance gaps',       on: false },
+                  { label: 'Daily digest email',              on: false },
+                ].map((n, i) => (
+                  <div key={i} className="d-flex align-items-center justify-content-between py-1" style={{ borderBottom: i < 4 ? '1px solid #f4f7f9' : 'none' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#344054' }}>{n.label}</span>
+                    <Toggle on={n.on} onChange={() => {}} />
+                  </div>
+                ))}
+              </Card.Body>
+            </Card>
           </div>
-        </div>
-      )}
-
-      {/* ── General Tab ──────────────────────────────────────────────────────── */}
-      {activeTab === 'general' && (
-        <div className="space-y-4">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
-            <h3 className="text-slate-200 font-semibold text-sm">Platform Preferences</h3>
-            {[
-              { label: 'Organisation Name',   key: 'org',      val: 'Acme Financial Corp', type: 'text'   },
-              { label: 'Default Risk Appetite', key: 'appetite', val: 'Low',               type: 'text'   },
-              { label: 'Reporting Currency',   key: 'currency', val: 'USD',                type: 'text'   },
-            ].map(f => (
-              <div key={f.key}>
-                <label className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 block">{f.label}</label>
-                <input defaultValue={f.val} type={f.type}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-cyan-500 transition-colors" />
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-end">
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 text-sm font-semibold transition-colors">
-              <Save size={14} /> Save
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Notifications Tab ─────────────────────────────────────────────── */}
-      {activeTab === 'notifications' && (
-        <div className="space-y-4">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
-            <h3 className="text-slate-200 font-semibold text-sm">Alert Thresholds</h3>
-            {[
-              { label: 'Notify on Critical risks',       on: true  },
-              { label: 'Notify on new DORA incidents',   on: true  },
-              { label: 'Notify on Wazuh critical alerts',on: true  },
-              { label: 'Notify on compliance gaps',      on: false },
-              { label: 'Daily digest email',             on: false },
-            ].map(n => (
-              <div key={n.label} className="flex items-center justify-between py-1">
-                <span className="text-slate-300 text-sm">{n.label}</span>
-                <div className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${n.on ? 'bg-cyan-500' : 'bg-slate-600'}`}>
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${n.on ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

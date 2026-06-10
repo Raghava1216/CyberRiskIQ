@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Plus, Download, Search, ChevronDown, DollarSign, TrendingUp, Shield, AlertTriangle, Info, X } from 'lucide-react';
+import { Card, Row, Col, Badge, Form, InputGroup, Table, Nav } from 'react-bootstrap';
+import { Plus, Download, Search, DollarSign, TrendingUp, Shield, AlertTriangle, X } from 'react-feather';
 import { mockRisks } from '../lib/mockData';
 import RiskMatrix from '../components/RiskMatrix';
 import AddRiskModal, { type NewRisk } from '../components/AddRiskModal';
 import type { Risk } from '../lib/types';
 
 const CATEGORIES = ['All', 'Strategic', 'Operational', 'Technical', 'Compliance', 'Financial', 'Reputational'];
-const STATUSES = ['All', 'Open', 'In Treatment', 'Accepted', 'Closed', 'Transferred'];
+const STATUSES   = ['All', 'Open', 'In Treatment', 'Accepted', 'Closed', 'Transferred'];
 const TREATMENTS = ['All', 'Mitigate', 'Accept', 'Transfer', 'Avoid'];
 const FRAMEWORKS = ['All', 'DORA', 'NIS2', 'NIST CSF', 'ISO 27001', 'GDPR', 'PCI DSS', 'SOC 2'];
 
@@ -15,219 +16,185 @@ const fmt$ = (n: number) =>
   : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K`
   : `$${n}`;
 
-const treatmentColor = (t: string) => {
-  if (t === 'Mitigate')  return 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20';
-  if (t === 'Accept')    return 'bg-slate-700/40 text-slate-400 border-slate-600';
-  if (t === 'Transfer')  return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20';
-  if (t === 'Avoid')     return 'bg-orange-500/15 text-orange-400 border-orange-500/20';
-  return '';
+const treatmentBg = (t: string) => {
+  if (t === 'Mitigate')  return { bg: '#eff6ff', color: '#3B82EC', border: '#bfdbfe' };
+  if (t === 'Accept')    return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
+  if (t === 'Transfer')  return { bg: '#f0fdf4', color: '#4BBF73', border: '#bbf7d0' };
+  if (t === 'Avoid')     return { bg: '#fff7ed', color: '#fd7e14', border: '#fed7aa' };
+  return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
 };
 
-const statusColor = (s: string) => {
-  if (s === 'Open')         return 'bg-red-500/15 text-red-400 border-red-500/20';
-  if (s === 'In Treatment') return 'bg-amber-500/15 text-amber-400 border-amber-500/20';
-  if (s === 'Accepted')     return 'bg-slate-700/40 text-slate-400 border-slate-600';
-  if (s === 'Closed')       return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20';
-  return 'bg-slate-700/40 text-slate-400 border-slate-600';
+const statusBg = (s: string) => {
+  if (s === 'Open')         return { bg: '#fff5f5', color: '#d9534f', border: '#fecaca' };
+  if (s === 'In Treatment') return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
+  if (s === 'Accepted')     return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
+  if (s === 'Closed')       return { bg: '#f0fdf4', color: '#4BBF73', border: '#bbf7d0' };
+  return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
 };
 
-const treatmentStatusDot = (s: string) => {
-  if (s === 'Completed')   return 'bg-emerald-500';
-  if (s === 'In Progress') return 'bg-amber-500';
-  return 'bg-slate-600';
-};
+function InlineBadge({ text, style }: { text: string; style: { bg: string; color: string; border: string } }) {
+  return (
+    <span style={{ display: 'inline-block', fontSize: '0.72rem', padding: '2px 8px', borderRadius: 6, background: style.bg, color: style.color, border: `1px solid ${style.border}`, fontWeight: 500, whiteSpace: 'nowrap' }}>
+      {text}
+    </span>
+  );
+}
 
 function ScoreBar({ score, max = 25 }: { score: number; max?: number }) {
   const pct = (score / max) * 100;
-  const color = score >= 16 ? 'bg-red-500' : score >= 10 ? 'bg-orange-500' : score >= 6 ? 'bg-amber-500' : 'bg-emerald-500';
-  const textColor = score >= 16 ? 'text-red-400' : score >= 10 ? 'text-orange-400' : score >= 6 ? 'text-amber-400' : 'text-emerald-400';
+  const color = score >= 16 ? '#d9534f' : score >= 10 ? '#fd7e14' : score >= 6 ? '#f0ad4e' : '#4BBF73';
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+    <div className="d-flex align-items-center gap-2">
+      <div style={{ flex: 1, height: 6, background: '#f0f0f0', borderRadius: 999, overflow: 'hidden' }}>
+        <div style={{ height: '100%', borderRadius: 999, background: color, width: `${pct}%` }} />
       </div>
-      <span className={`text-xs font-bold w-5 text-right ${textColor}`}>{score}</span>
+      <span style={{ fontSize: '0.72rem', fontWeight: 700, color, width: 20, textAlign: 'right' }}>{score}</span>
     </div>
   );
 }
 
 function FAIRDetailPanel({ risk, onClose }: { risk: Risk; onClose: () => void }) {
+  const tm = treatmentBg(risk.treatment);
   return (
-    <div className="fixed inset-y-0 right-0 z-50 flex">
-      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative ml-auto w-full max-w-lg bg-slate-900 border-l border-slate-700 flex flex-col h-full shadow-2xl overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+    <>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(16,24,40,0.5)', zIndex: 1040 }} onClick={onClose} />
+      <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, zIndex: 1050, width: '100%', maxWidth: 480, background: '#fff', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)', overflowY: 'auto', fontFamily: 'Poppins,sans-serif' }}>
+        <div className="d-flex align-items-center justify-content-between px-4 py-3" style={{ borderBottom: '1px solid #e4e7ec', position: 'sticky', top: 0, background: '#fff', zIndex: 10 }}>
           <div>
-            <h2 className="text-slate-100 font-bold text-sm">FAIR Risk Analysis</h2>
-            <p className="text-slate-500 text-xs mt-0.5 line-clamp-1">{risk.title}</p>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#101828' }}>FAIR Risk Analysis</div>
+            <div style={{ fontSize: '0.75rem', color: '#98a2b3', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>{risk.title}</div>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
-            <X size={18} />
-          </button>
+          <button className="btn p-1 border-0" onClick={onClose} style={{ color: '#667085' }}><X size={18} /></button>
         </div>
-
-        <div className="p-5 space-y-6">
-          {/* Financial summary */}
-          <div className="grid grid-cols-2 gap-3">
+        <div className="p-4">
+          <Row className="g-2 mb-4">
             {[
-              { l: 'ALE (Most Likely)', v: fmt$(risk.fair.ale), c: 'text-red-400', sub: 'Annualised Loss Expectancy' },
-              { l: 'ALE Min', v: fmt$(risk.fair.ale_min), c: 'text-amber-400', sub: 'Best case scenario' },
-              { l: 'ALE Max', v: fmt$(risk.fair.ale_max), c: 'text-red-400', sub: 'Worst case scenario' },
-              { l: 'Treatment Cost', v: fmt$(risk.treatment_cost), c: 'text-cyan-400', sub: 'Investment to remediate' },
+              { l: 'ALE (Most Likely)', v: fmt$(risk.fair.ale),           c: '#d9534f', sub: 'Annualised Loss Expectancy' },
+              { l: 'ALE Min',           v: fmt$(risk.fair.ale_min),       c: '#f0ad4e', sub: 'Best case' },
+              { l: 'ALE Max',           v: fmt$(risk.fair.ale_max),       c: '#d9534f', sub: 'Worst case' },
+              { l: 'Treatment Cost',    v: fmt$(risk.treatment_cost),     c: '#3B82EC', sub: 'Investment to remediate' },
             ].map(s => (
-              <div key={s.l} className="bg-slate-800/60 rounded-lg p-3">
-                <p className={`text-lg font-bold tabular-nums ${s.c}`}>{s.v}</p>
-                <p className="text-slate-300 text-xs font-medium">{s.l}</p>
-                <p className="text-slate-600 text-xs">{s.sub}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* ROI */}
-          {risk.treatment_cost > 0 && (
-            <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-xl px-4 py-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-emerald-400 font-bold text-2xl tabular-nums">{risk.remediation_roi}%</p>
-                  <p className="text-slate-400 text-xs">Remediation ROI</p>
+              <Col key={s.l} xs={6}>
+                <div className="p-3 rounded" style={{ background: '#f9fafb', border: '1px solid #e4e7ec' }}>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: s.c }}>{s.v}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#344054', fontWeight: 500 }}>{s.l}</div>
+                  <div style={{ fontSize: '0.68rem', color: '#98a2b3' }}>{s.sub}</div>
                 </div>
-                <div className="text-right">
-                  <p className="text-slate-300 text-sm font-medium">{fmt$(risk.fair.ale - risk.treatment_cost)}</p>
-                  <p className="text-slate-500 text-xs">Net risk reduction value</p>
+              </Col>
+            ))}
+          </Row>
+
+          {risk.treatment_cost > 0 && (
+            <div className="p-3 rounded mb-4" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+              <div className="d-flex align-items-center justify-content-between">
+                <div>
+                  <div style={{ color: '#4BBF73', fontWeight: 700, fontSize: '1.4rem' }}>{risk.remediation_roi}%</div>
+                  <div style={{ color: '#667085', fontSize: '0.78rem' }}>Remediation ROI</div>
+                </div>
+                <div className="text-end">
+                  <div style={{ color: '#344054', fontWeight: 500 }}>{fmt$(risk.fair.ale - risk.treatment_cost)}</div>
+                  <div style={{ color: '#98a2b3', fontSize: '0.72rem' }}>Net risk reduction value</div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* FAIR inputs */}
-          <div>
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-3">FAIR Model Inputs</p>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-slate-800">
-                <span className="text-slate-400 text-xs">Threat Event Frequency (TEF)</span>
-                <span className="text-slate-300 text-xs font-mono">{risk.fair.tef_min}–{risk.fair.tef_likely}–{risk.fair.tef_max} /yr</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-800">
-                <span className="text-slate-400 text-xs">Vulnerability / Contact probability</span>
-                <span className="text-slate-300 text-xs font-mono">{risk.fair.vulnerability}%</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-800">
-                <span className="text-slate-400 text-xs">Loss Event Frequency (LEF)</span>
-                <span className="text-slate-300 text-xs font-mono">{risk.fair.lef} /yr</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-slate-800">
-                <span className="text-slate-400 text-xs">Loss Magnitude — Min / Likely / Max</span>
-                <span className="text-slate-300 text-xs font-mono">{fmt$(risk.fair.lm_min)} / {fmt$(risk.fair.lm_likely)} / {fmt$(risk.fair.lm_max)}</span>
-              </div>
+          <div style={{ fontSize: '0.7rem', color: '#98a2b3', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>FAIR Model Inputs</div>
+          {[
+            { l: 'Threat Event Frequency (TEF)', v: `${risk.fair.tef_min}–${risk.fair.tef_likely}–${risk.fair.tef_max} /yr` },
+            { l: 'Vulnerability / Contact probability', v: `${risk.fair.vulnerability}%` },
+            { l: 'Loss Event Frequency (LEF)', v: `${risk.fair.lef} /yr` },
+            { l: 'Loss Magnitude — Min / Likely / Max', v: `${fmt$(risk.fair.lm_min)} / ${fmt$(risk.fair.lm_likely)} / ${fmt$(risk.fair.lm_max)}` },
+          ].map(row => (
+            <div key={row.l} className="d-flex align-items-center justify-content-between py-2" style={{ borderBottom: '1px solid #f4f7f9', fontSize: '0.78rem' }}>
+              <span style={{ color: '#667085' }}>{row.l}</span>
+              <span style={{ color: '#344054', fontFamily: 'monospace', fontWeight: 500 }}>{row.v}</span>
             </div>
-          </div>
+          ))}
 
-          {/* GRC linkage */}
-          <div>
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-3">GRC / Regulatory Linkage</p>
-            <div className="flex flex-wrap gap-2 mb-2">
+          <div className="mt-4">
+            <div style={{ fontSize: '0.7rem', color: '#98a2b3', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>GRC / Regulatory Linkage</div>
+            <div className="d-flex flex-wrap gap-1 mb-2">
               {risk.framework_tags.map(f => (
-                <span key={f} className="text-xs px-2 py-1 bg-slate-700/60 text-slate-300 rounded-lg border border-slate-600/50 font-medium">{f}</span>
+                <span key={f} style={{ fontSize: '0.72rem', padding: '3px 8px', background: '#f4f7f9', border: '1px solid #e4e7ec', borderRadius: 6, color: '#344054' }}>{f}</span>
               ))}
             </div>
-            {risk.regulatory_reference && (
-              <p className="text-slate-500 text-xs">{risk.regulatory_reference}</p>
-            )}
+            {risk.regulatory_reference && <div style={{ fontSize: '0.75rem', color: '#98a2b3' }}>{risk.regulatory_reference}</div>}
           </div>
 
-          {/* Treatment */}
-          <div>
-            <p className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-3">Treatment Details</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-800/60 rounded-lg p-3">
-                <p className="text-slate-500 text-xs mb-1">Strategy</p>
-                <span className={`text-xs px-2 py-0.5 rounded border font-medium ${treatmentColor(risk.treatment)}`}>{risk.treatment}</span>
-              </div>
-              <div className="bg-slate-800/60 rounded-lg p-3">
-                <p className="text-slate-500 text-xs mb-1">Treatment Status</p>
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full ${treatmentStatusDot(risk.treatment_status)}`} />
-                  <span className="text-slate-300 text-xs">{risk.treatment_status}</span>
+          <div className="mt-4">
+            <div style={{ fontSize: '0.7rem', color: '#98a2b3', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Treatment Details</div>
+            <Row className="g-2">
+              <Col xs={6}>
+                <div className="p-3 rounded" style={{ background: '#f9fafb', border: '1px solid #e4e7ec' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#98a2b3', marginBottom: 4 }}>Strategy</div>
+                  <InlineBadge text={risk.treatment} style={tm} />
                 </div>
-              </div>
-            </div>
+              </Col>
+              <Col xs={6}>
+                <div className="p-3 rounded" style={{ background: '#f9fafb', border: '1px solid #e4e7ec' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#98a2b3', marginBottom: 4 }}>Treatment Status</div>
+                  <span style={{ fontSize: '0.8rem', color: '#344054', fontWeight: 500 }}>{risk.treatment_status}</span>
+                </div>
+              </Col>
+            </Row>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
 function exportToCSV(risks: Risk[]) {
-  const headers = ['ID', 'Title', 'Category', 'Status', 'Treatment', 'Inherent Score', 'Residual Score', 'ALE', 'ALE Min', 'ALE Max', 'Treatment Cost', 'ROI %', 'Framework Tags', 'Regulatory Ref', 'Owner', 'Review Date'];
-  const rows = risks.map(r => [
-    r.id, `"${r.title.replace(/"/g, '""')}"`, r.category, r.status, r.treatment,
-    r.inherent_score, r.residual_score, r.fair.ale, r.fair.ale_min, r.fair.ale_max,
-    r.treatment_cost, r.remediation_roi,
-    `"${r.framework_tags.join('; ')}"`, `"${r.regulatory_reference}"`,
-    `"${r.owner}"`, r.review_date,
-  ]);
+  const headers = ['ID','Title','Category','Status','Treatment','Inherent Score','Residual Score','ALE','ALE Min','ALE Max','Treatment Cost','ROI %','Framework Tags','Regulatory Ref','Owner','Review Date'];
+  const rows = risks.map(r => [r.id, `"${r.title.replace(/"/g,'""')}"`, r.category, r.status, r.treatment, r.inherent_score, r.residual_score, r.fair.ale, r.fair.ale_min, r.fair.ale_max, r.treatment_cost, r.remediation_roi, `"${r.framework_tags.join('; ')}"`, `"${r.regulatory_reference}"`, `"${r.owner}"`, r.review_date]);
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `risk-register-fair-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const a = document.createElement('a'); a.href = url; a.download = `risk-register-fair-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 
 export default function Risks() {
-  const [riskData, setRiskData] = useState<Risk[]>(mockRisks as Risk[]);
-  const [search, setSearch]       = useState('');
-  const [category, setCategory]   = useState('All');
-  const [status, setStatus]       = useState('All');
-  const [treatment, setTreatment] = useState('All');
-  const [framework, setFramework] = useState('All');
-  const [view, setView]           = useState<'list' | 'matrix' | 'financial'>('list');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [detailRisk, setDetailRisk] = useState<Risk | null>(null);
-  const [toast, setToast]         = useState<string | null>(null);
+  const [riskData, setRiskData]       = useState<Risk[]>(mockRisks as Risk[]);
+  const [search, setSearch]           = useState('');
+  const [category, setCategory]       = useState('All');
+  const [status, setStatus]           = useState('All');
+  const [treatment, setTreatment]     = useState('All');
+  const [framework, setFramework]     = useState('All');
+  const [view, setView]               = useState<'list' | 'matrix' | 'financial'>('list');
+  const [modalOpen, setModalOpen]     = useState(false);
+  const [detailRisk, setDetailRisk]   = useState<Risk | null>(null);
+  const [toast, setToast]             = useState<string | null>(null);
 
   const filtered = riskData.filter(r => {
     const q = search.toLowerCase();
-    const matchSearch = r.title.toLowerCase().includes(q) || r.owner.toLowerCase().includes(q) || r.regulatory_reference?.toLowerCase().includes(q);
-    const matchCat  = category === 'All' || r.category === category;
-    const matchStat = status === 'All' || r.status === status;
-    const matchTreat = treatment === 'All' || r.treatment === treatment;
-    const matchFw = framework === 'All' || r.framework_tags?.includes(framework);
-    return matchSearch && matchCat && matchStat && matchTreat && matchFw;
+    return (r.title.toLowerCase().includes(q) || r.owner.toLowerCase().includes(q) || r.regulatory_reference?.toLowerCase().includes(q))
+      && (category === 'All' || r.category === category)
+      && (status === 'All' || r.status === status)
+      && (treatment === 'All' || r.treatment === treatment)
+      && (framework === 'All' || r.framework_tags?.includes(framework));
   });
 
   const totalALE = filtered.reduce((s, r) => s + r.fair.ale, 0);
   const totalTreatment = filtered.reduce((s, r) => s + r.treatment_cost, 0);
   const avgROI = filtered.filter(r => r.remediation_roi > 0).length > 0
-    ? Math.round(filtered.filter(r => r.remediation_roi > 0).reduce((s, r) => s + r.remediation_roi, 0) / filtered.filter(r => r.remediation_roi > 0).length)
-    : 0;
+    ? Math.round(filtered.filter(r => r.remediation_roi > 0).reduce((s, r) => s + r.remediation_roi, 0) / filtered.filter(r => r.remediation_roi > 0).length) : 0;
 
   const handleAddRisk = (newRisk: NewRisk) => {
     const score = newRisk.likelihood * newRisk.impact;
     const ale = score * 80_000;
     const row: Risk = {
-      id: String(riskData.length + 1),
-      title: newRisk.title,
-      category: newRisk.category,
+      id: String(riskData.length + 1), title: newRisk.title, category: newRisk.category,
       status: newRisk.status === 'Active' ? 'Open' : 'Accepted',
-      likelihood: newRisk.likelihood,
-      impact: newRisk.impact,
-      inherent_score: score,
-      residual_score: Math.max(1, score - 3),
+      likelihood: newRisk.likelihood, impact: newRisk.impact,
+      inherent_score: score, residual_score: Math.max(1, score - 3),
       owner: newRisk.owners[0] ?? 'Unassigned',
       review_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       tags: newRisk.tags,
       fair: { tef_min: 0.5, tef_max: 3, tef_likely: 1, vulnerability: 60, lm_min: ale * 0.2, lm_max: ale * 3, lm_likely: ale, ale, ale_min: ale * 0.1, ale_max: ale * 2, lef: 1 },
-      treatment: 'Mitigate',
-      treatment_cost: Math.round(ale * 0.1),
-      treatment_status: 'Not Started',
+      treatment: 'Mitigate', treatment_cost: Math.round(ale * 0.1), treatment_status: 'Not Started',
       remediation_roi: Math.round(((ale - ale * 0.1) / (ale * 0.1)) * 100),
-      financial_impact: ale,
-      framework_tags: [],
-      regulatory_reference: '',
+      financial_impact: ale, framework_tags: [], regulatory_reference: '',
     };
     setRiskData(prev => [row, ...prev]);
     setToast(`Risk "${newRisk.title}" added to register`);
@@ -235,204 +202,158 @@ export default function Risks() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-screen-2xl relative">
+    <div className="progrec-page p-4 p-lg-5">
       {modalOpen && <AddRiskModal onClose={() => setModalOpen(false)} onSubmit={handleAddRisk} />}
       {detailRisk && <FAIRDetailPanel risk={detailRisk} onClose={() => setDetailRisk(null)} />}
 
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm px-4 py-3 rounded-xl shadow-xl backdrop-blur flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />{toast}
+        <div className="pg-toast">
+          <span className="live-dot" />
+          {toast}
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
         <div>
-          <h2 className="text-slate-100 font-bold text-xl">Risk Register</h2>
-          <p className="text-slate-500 text-sm">{riskData.length} risks · FAIR financial model · GRC framework linkage</p>
+          <h5 className="fw-bold mb-0" style={{ color: '#101828' }}>Risk Register</h5>
+          <span style={{ fontSize: '0.82rem', color: '#667085' }}>{riskData.length} risks · FAIR financial model · GRC framework linkage</span>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => exportToCSV(filtered)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800 text-sm transition-colors">
-            <Download size={16} /> Export FAIR CSV
+        <div className="d-flex gap-2">
+          <button className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2" onClick={() => exportToCSV(filtered)}>
+            <Download size={15} /> Export FAIR CSV
           </button>
-          <button onClick={() => setModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold text-sm transition-colors">
-            <Plus size={16} /> Add Risk
+          <button className="btn btn-primary btn-sm d-flex align-items-center gap-2" onClick={() => setModalOpen(true)}>
+            <Plus size={15} /> Add Risk
           </button>
         </div>
       </div>
 
-      {/* Financial KPI strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* KPI strip */}
+      <Row className="g-3 mb-4">
         {[
-          { l: 'Aggregate ALE', v: fmt$(totalALE), sub: 'Annualised Loss Expectancy', c: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20', icon: DollarSign },
-          { l: 'Treatment Budget', v: fmt$(totalTreatment), sub: 'Total remediation cost', c: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20', icon: Shield },
-          { l: 'Avg Remediation ROI', v: `${avgROI}%`, sub: 'Return on risk investment', c: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20', icon: TrendingUp },
-          { l: 'Open/In Treatment', v: String(filtered.filter(r => ['Open', 'In Treatment'].includes(r.status)).length), sub: `of ${filtered.length} filtered risks`, c: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20', icon: AlertTriangle },
+          { l: 'Aggregate ALE',     v: fmt$(totalALE),        sub: 'Annualised Loss Expectancy',   accent: '#d9534f', icon: DollarSign,    cls: 'stat-card-danger' },
+          { l: 'Treatment Budget',  v: fmt$(totalTreatment),  sub: 'Total remediation cost',        accent: '#3B82EC', icon: Shield,        cls: 'stat-card-primary' },
+          { l: 'Avg Remediation ROI', v: `${avgROI}%`,        sub: 'Return on risk investment',     accent: '#4BBF73', icon: TrendingUp,    cls: 'stat-card-success' },
+          { l: 'Open/In Treatment', v: String(filtered.filter(r => ['Open','In Treatment'].includes(r.status)).length), sub: `of ${filtered.length} filtered`, accent: '#f0ad4e', icon: AlertTriangle, cls: 'stat-card-warning' },
         ].map(s => (
-          <div key={s.l} className={`rounded-xl border p-4 ${s.bg}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <s.icon size={14} className={s.c} />
-              <p className={`text-xl font-bold tabular-nums ${s.c}`}>{s.v}</p>
-            </div>
-            <p className="text-slate-300 text-xs font-medium">{s.l}</p>
-            <p className="text-slate-600 text-xs">{s.sub}</p>
-          </div>
+          <Col key={s.l} xs={6} md={3}>
+            <Card className={`shadow-sm border ${s.cls} h-100`} style={{ borderRadius: 10 }}>
+              <Card.Body className="p-3">
+                <div className="d-flex align-items-center gap-2 mb-1">
+                  <s.icon size={14} color={s.accent} />
+                  <span style={{ fontSize: '1.2rem', fontWeight: 700, color: s.accent, fontVariantNumeric: 'tabular-nums' }}>{s.v}</span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#344054', fontWeight: 500 }}>{s.l}</div>
+                <div style={{ fontSize: '0.7rem', color: '#98a2b3' }}>{s.sub}</div>
+              </Card.Body>
+            </Card>
+          </Col>
         ))}
-      </div>
+      </Row>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-        <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2 flex-1 min-w-48">
-          <Search size={16} className="text-slate-500" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search title, owner, regulation..."
-            className="bg-transparent text-slate-300 text-sm outline-none flex-1 placeholder:text-slate-600" />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { val: category, set: setCategory, opts: CATEGORIES, ph: 'Category' },
-            { val: status, set: setStatus, opts: STATUSES, ph: 'Status' },
-            { val: treatment, set: setTreatment, opts: TREATMENTS, ph: 'Treatment' },
-            { val: framework, set: setFramework, opts: FRAMEWORKS, ph: 'Framework' },
-          ].map(({ val, set, opts, ph }) => (
-            <div key={ph} className="relative">
-              <select value={val} onChange={e => set(e.target.value)}
-                className="appearance-none bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 pr-8 outline-none focus:border-cyan-500 cursor-pointer">
-                {opts.map(o => <option key={o}>{o}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-2 top-3 text-slate-500 pointer-events-none" />
-            </div>
+      <div className="d-flex flex-wrap gap-2 mb-4">
+        <InputGroup style={{ maxWidth: 280, flex: '1 1 200px' }}>
+          <InputGroup.Text className="bg-white border-end-0"><Search size={14} color="#98a2b3" /></InputGroup.Text>
+          <Form.Control value={search} onChange={e => setSearch(e.target.value)} placeholder="Search title, owner, regulation…" style={{ fontSize: '0.82rem', borderLeft: 0 }} />
+        </InputGroup>
+        {[
+          { val: category, set: setCategory, opts: CATEGORIES },
+          { val: status,   set: setStatus,   opts: STATUSES   },
+          { val: treatment,set: setTreatment,opts: TREATMENTS  },
+          { val: framework,set: setFramework,opts: FRAMEWORKS  },
+        ].map(({ val, set, opts }, i) => (
+          <Form.Select key={i} value={val} onChange={e => set(e.target.value)} style={{ maxWidth: 140, fontSize: '0.82rem' }}>
+            {opts.map(o => <option key={o}>{o}</option>)}
+          </Form.Select>
+        ))}
+        <div className="btn-group">
+          {(['list','financial','matrix'] as const).map(v => (
+            <button key={v} onClick={() => setView(v)} className={`btn btn-sm ${view === v ? 'btn-primary' : 'btn-outline-secondary'}`} style={{ fontSize: '0.78rem', textTransform: 'capitalize' }}>{v}</button>
           ))}
-          <div className="flex rounded-lg overflow-hidden border border-slate-700">
-            {(['list', 'financial', 'matrix'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)}
-                className={`px-3 py-2 text-sm transition-colors capitalize ${view === v ? 'bg-slate-700 text-slate-100' : 'bg-slate-800 text-slate-400 hover:text-slate-300'}`}>
-                {v}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
-      {/* Views */}
+      {/* Matrix view */}
       {view === 'matrix' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
-          <h3 className="text-slate-100 font-semibold mb-6">Risk Heat Map</h3>
-          <RiskMatrix risks={filtered} />
-        </div>
+        <Card className="shadow-sm border-0 mb-4" style={{ borderRadius: 10 }}>
+          <Card.Body className="p-4">
+            <h6 className="fw-semibold mb-4" style={{ color: '#101828' }}>Risk Heat Map</h6>
+            <RiskMatrix risks={filtered} />
+          </Card.Body>
+        </Card>
       )}
 
+      {/* Financial view */}
       {view === 'financial' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-700/50 flex items-center gap-2">
-            <DollarSign size={16} className="text-cyan-400" />
-            <h3 className="text-slate-100 font-semibold text-sm">Financial Risk View — FAIR Model</h3>
-            <Info size={14} className="text-slate-600" />
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-700/50">
-                  {['Risk', 'ALE (Likely)', 'ALE Range', 'Treatment', 'Treatment Cost', 'ROI', 'Frameworks', 'Status'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
+        <Card className="shadow-sm border-0 mb-4" style={{ borderRadius: 10, overflow: 'hidden' }}>
+          <Card.Header className="bg-white px-4 py-3 d-flex align-items-center gap-2" style={{ borderBottom: '1px solid #e4e7ec' }}>
+            <DollarSign size={16} color="#3B82EC" />
+            <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#101828' }}>Financial Risk View — FAIR Model</span>
+          </Card.Header>
+          <div className="table-responsive">
+            <Table hover className="mb-0" style={{ fontSize: '0.82rem' }}>
+              <thead style={{ background: '#f9fafb' }}>
+                <tr>{['Risk','ALE (Likely)','ALE Range','Treatment','Treatment Cost','ROI','Frameworks','Status'].map(h => (
+                  <th key={h} className="px-4 py-3 border-bottom fw-semibold" style={{ fontSize: '0.72rem', color: '#98a2b3', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}</tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/30">
+              <tbody>
                 {filtered.map(r => (
-                  <tr key={r.id} className="hover:bg-slate-800/40 transition-colors cursor-pointer" onClick={() => setDetailRisk(r)}>
-                    <td className="px-4 py-3 max-w-xs">
-                      <p className="text-slate-200 text-xs font-medium truncate">{r.title}</p>
-                      <p className="text-slate-600 text-xs mt-0.5">{r.category}</p>
+                  <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => setDetailRisk(r)}>
+                    <td className="px-4 py-3" style={{ maxWidth: 200 }}>
+                      <div style={{ color: '#344054', fontSize: '0.82rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
+                      <div style={{ color: '#98a2b3', fontSize: '0.72rem' }}>{r.category}</div>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-red-400 font-semibold tabular-nums text-sm">{fmt$(r.fair.ale)}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-slate-500 text-xs tabular-nums whitespace-nowrap">{fmt$(r.fair.ale_min)} – {fmt$(r.fair.ale_max)}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded border ${treatmentColor(r.treatment)}`}>{r.treatment}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-cyan-400 font-semibold tabular-nums text-xs">{r.treatment_cost > 0 ? fmt$(r.treatment_cost) : '—'}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`font-semibold tabular-nums text-sm ${r.remediation_roi >= 500 ? 'text-emerald-400' : r.remediation_roi > 0 ? 'text-blue-400' : 'text-slate-500'}`}>
-                        {r.remediation_roi > 0 ? `${r.remediation_roi}%` : '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1 flex-wrap">
-                        {(r.framework_tags ?? []).slice(0, 2).map(f => (
-                          <span key={f} className="text-xs px-1.5 py-px bg-slate-700/50 text-slate-400 rounded border border-slate-600/30">{f}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded border ${statusColor(r.status)}`}>{r.status}</span>
-                    </td>
+                    <td className="px-4 py-3"><span style={{ color: '#d9534f', fontWeight: 600, fontFamily: 'monospace' }}>{fmt$(r.fair.ale)}</span></td>
+                    <td className="px-4 py-3"><span style={{ color: '#98a2b3', fontSize: '0.75rem', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{fmt$(r.fair.ale_min)} – {fmt$(r.fair.ale_max)}</span></td>
+                    <td className="px-4 py-3"><InlineBadge text={r.treatment} style={treatmentBg(r.treatment)} /></td>
+                    <td className="px-4 py-3"><span style={{ color: '#3B82EC', fontWeight: 600, fontFamily: 'monospace', fontSize: '0.78rem' }}>{r.treatment_cost > 0 ? fmt$(r.treatment_cost) : '—'}</span></td>
+                    <td className="px-4 py-3"><span style={{ fontWeight: 600, color: r.remediation_roi >= 500 ? '#4BBF73' : r.remediation_roi > 0 ? '#3B82EC' : '#98a2b3' }}>{r.remediation_roi > 0 ? `${r.remediation_roi}%` : '—'}</span></td>
+                    <td className="px-4 py-3"><div className="d-flex gap-1 flex-wrap">{(r.framework_tags ?? []).slice(0,2).map(f => <span key={f} style={{ fontSize: '0.65rem', padding: '1px 5px', background: '#f4f7f9', border: '1px solid #e4e7ec', borderRadius: 4, color: '#667085' }}>{f}</span>)}</div></td>
+                    <td className="px-4 py-3"><InlineBadge text={r.status} style={statusBg(r.status)} /></td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
-          {filtered.length === 0 && <div className="py-12 text-center text-slate-500">No risks match filters.</div>}
-        </div>
+          {filtered.length === 0 && <div className="py-5 text-center" style={{ color: '#98a2b3' }}>No risks match filters.</div>}
+        </Card>
       )}
 
+      {/* List view */}
       {view === 'list' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-700/50">
-                  {['Risk', 'Category', 'Status', 'Inherent', 'Residual', 'ALE', 'Treatment', 'Framework', 'Owner'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
+        <Card className="shadow-sm border-0" style={{ borderRadius: 10, overflow: 'hidden' }}>
+          <div className="table-responsive">
+            <Table hover className="mb-0" style={{ fontSize: '0.82rem' }}>
+              <thead style={{ background: '#f9fafb' }}>
+                <tr>{['Risk','Category','Status','Inherent','Residual','ALE','Treatment','Framework','Owner'].map(h => (
+                  <th key={h} className="px-4 py-3 border-bottom fw-semibold" style={{ fontSize: '0.72rem', color: '#98a2b3', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}</tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/30">
+              <tbody>
                 {filtered.map(r => (
-                  <tr key={r.id} className="hover:bg-slate-800/40 transition-colors group cursor-pointer" onClick={() => setDetailRisk(r)}>
-                    <td className="px-4 py-3 max-w-xs">
-                      <p className="text-slate-200 font-medium text-sm truncate">{r.title}</p>
-                      <div className="flex gap-1 mt-1 flex-wrap">
-                        {r.tags.slice(0, 2).map(t => (
-                          <span key={t} className="text-xs bg-slate-700/50 text-slate-500 px-1.5 py-0.5 rounded">{t}</span>
-                        ))}
-                      </div>
+                  <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => setDetailRisk(r)}>
+                    <td className="px-4 py-3" style={{ maxWidth: 220 }}>
+                      <div style={{ color: '#344054', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</div>
+                      <div className="d-flex gap-1 mt-1 flex-wrap">{r.tags.slice(0,2).map(t => <span key={t} style={{ fontSize: '0.65rem', padding: '1px 5px', background: '#f4f7f9', border: '1px solid #e4e7ec', borderRadius: 4, color: '#667085' }}>{t}</span>)}</div>
                     </td>
-                    <td className="px-4 py-3"><span className="text-slate-400 text-xs">{r.category}</span></td>
-                    <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded border ${statusColor(r.status)}`}>{r.status}</span></td>
-                    <td className="px-4 py-3 w-28"><ScoreBar score={r.inherent_score} /></td>
-                    <td className="px-4 py-3 w-28"><ScoreBar score={r.residual_score} /></td>
-                    <td className="px-4 py-3">
-                      <span className="text-red-400 font-semibold tabular-nums text-xs">{fmt$(r.fair.ale)}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-xs px-2 py-0.5 rounded border ${treatmentColor(r.treatment)}`}>{r.treatment}</span>
-                        <div className={`w-1.5 h-1.5 rounded-full ${treatmentStatusDot(r.treatment_status)}`} title={r.treatment_status} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1 flex-wrap">
-                        {(r.framework_tags ?? []).slice(0, 2).map(f => (
-                          <span key={f} className="text-xs px-1.5 py-px bg-slate-700/50 text-slate-400 rounded border border-slate-600/30">{f}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3"><span className="text-slate-400 text-xs whitespace-nowrap">{r.owner}</span></td>
+                    <td className="px-4 py-3"><span style={{ color: '#667085', fontSize: '0.78rem' }}>{r.category}</span></td>
+                    <td className="px-4 py-3"><InlineBadge text={r.status} style={statusBg(r.status)} /></td>
+                    <td className="px-4 py-3" style={{ minWidth: 110 }}><ScoreBar score={r.inherent_score} /></td>
+                    <td className="px-4 py-3" style={{ minWidth: 110 }}><ScoreBar score={r.residual_score} /></td>
+                    <td className="px-4 py-3"><span style={{ color: '#d9534f', fontWeight: 600, fontFamily: 'monospace', fontSize: '0.78rem' }}>{fmt$(r.fair.ale)}</span></td>
+                    <td className="px-4 py-3"><InlineBadge text={r.treatment} style={treatmentBg(r.treatment)} /></td>
+                    <td className="px-4 py-3"><div className="d-flex gap-1 flex-wrap">{(r.framework_tags ?? []).slice(0,2).map(f => <span key={f} style={{ fontSize: '0.65rem', padding: '1px 5px', background: '#f4f7f9', border: '1px solid #e4e7ec', borderRadius: 4, color: '#667085' }}>{f}</span>)}</div></td>
+                    <td className="px-4 py-3"><span style={{ color: '#667085', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{r.owner}</span></td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
-          {filtered.length === 0 && <div className="py-12 text-center text-slate-500">No risks match the current filters.</div>}
-        </div>
+          {filtered.length === 0 && <div className="py-5 text-center" style={{ color: '#98a2b3' }}>No risks match the current filters.</div>}
+        </Card>
       )}
     </div>
   );

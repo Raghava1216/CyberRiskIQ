@@ -1,35 +1,29 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  CheckCircle, XCircle, MinusCircle, PlayCircle, ClipboardList,
-  RefreshCw, ChevronRight, Calendar, User, Clock, AlertTriangle,
-} from 'lucide-react';
+import { CheckCircle, XCircle, MinusCircle, RefreshCw, ChevronRight, Calendar, User, Clock, AlertTriangle, PlayCircle } from 'react-feather';
+import { Card, Row, Col, Badge } from 'react-bootstrap';
 import type { ComplianceFramework, ComplianceAssessment } from '../lib/complianceTypes';
 import type { RunAssessmentForm } from '../lib/complianceTypes';
-import { generateComplianceReport } from '../lib/certificateExport';
 import {
-  fetchFrameworks, fetchAssessments, fetchControls, createAssessment,fetchResults,
+  fetchFrameworks, fetchAssessments, fetchControls, createAssessment,
 } from '../lib/complianceData';
 import RunAssessmentModal from '../components/RunAssessmentModal';
 import AssessmentReviewPanel from '../components/AssessmentReviewPanel';
-import CertificateRegistry from '../components/CertificateRegistry';
 
-// ── Sub-components ──────────────────────────────────────────────────────────
-
-function ScoreRing({ score, size = 80 }: { score: number; size?: number }) {
-  const r = (size / 2) - 8;
+function ScoreRing({ score, size = 72 }: { score: number; size?: number }) {
+  const r = (size / 2) - 7;
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
-  const color = score >= 80 ? '#10b981' : score >= 60 ? '#f97316' : '#ef4444';
+  const color = score >= 80 ? '#4BBF73' : score >= 60 ? '#f0ad4e' : '#d9534f';
   return (
     <svg width={size} height={size}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#1e293b" strokeWidth="7" />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="7"
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e9ecef" strokeWidth="6" />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth="6"
         strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        transform={`rotate(-90 ${size/2} ${size/2})`}
         style={{ transition: 'stroke-dasharray 0.8s ease' }}
       />
-      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="middle"
-        fill={color} fontSize="14" fontWeight="bold">
+      <text x={size/2} y={size/2} textAnchor="middle" dominantBaseline="middle"
+        fill={color} fontSize="13" fontWeight="bold" fontFamily="Poppins,sans-serif">
         {score}%
       </text>
     </svg>
@@ -38,21 +32,21 @@ function ScoreRing({ score, size = 80 }: { score: number; size?: number }) {
 
 function ControlBar({ compliant, partial, noncompliant }: { compliant: number; partial: number; noncompliant: number }) {
   const total = compliant + partial + noncompliant;
-  if (total === 0) return <div className="h-2 bg-slate-700/50 rounded-full" />;
+  if (total === 0) return <div style={{ height: 6, background: '#e9ecef', borderRadius: 999 }} />;
   return (
-    <div className="flex rounded-full overflow-hidden h-2 gap-px">
-      {compliant > 0    && <div className="bg-emerald-500 transition-all" style={{ width: `${(compliant / total) * 100}%` }} />}
-      {partial > 0      && <div className="bg-amber-500 transition-all"   style={{ width: `${(partial / total) * 100}%` }} />}
-      {noncompliant > 0 && <div className="bg-red-500 transition-all"     style={{ width: `${(noncompliant / total) * 100}%` }} />}
+    <div style={{ display: 'flex', borderRadius: 999, overflow: 'hidden', height: 6, gap: 1 }}>
+      {compliant    > 0 && <div style={{ background: '#4BBF73', width: `${(compliant    / total) * 100}%`, transition: 'width 0.8s' }} />}
+      {partial      > 0 && <div style={{ background: '#f0ad4e', width: `${(partial      / total) * 100}%`, transition: 'width 0.8s' }} />}
+      {noncompliant > 0 && <div style={{ background: '#d9534f', width: `${(noncompliant / total) * 100}%`, transition: 'width 0.8s' }} />}
     </div>
   );
 }
 
-const categoryColors: Record<string, string> = {
-  Security: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-  Privacy:  'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
-  Industry: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-  Regional: 'bg-slate-500/15 text-slate-400 border-slate-500/20',
+const categoryStyle = (cat: string) => {
+  if (cat === 'Security') return { bg: '#eff6ff', color: '#3B82EC', border: '#bfdbfe' };
+  if (cat === 'Privacy')  return { bg: '#f0fdf4', color: '#4BBF73', border: '#bbf7d0' };
+  if (cat === 'Industry') return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
+  return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
 };
 
 function fmtDate(iso: string | null) {
@@ -67,98 +61,57 @@ function fmtTime(iso: string | null) {
     d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
-function statusBadge(s: string) {
-  if (s === 'completed')  return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20';
-  if (s === 'in_progress') return 'bg-amber-500/15 text-amber-400 border-amber-500/20';
-  return 'bg-slate-700/40 text-slate-500 border-slate-600';
+function statusChipStyle(s: string) {
+  if (s === 'completed')   return { bg: '#f0fdf4', color: '#4BBF73', border: '#bbf7d0' };
+  if (s === 'in_progress') return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
+  return { bg: '#f9fafb', color: '#98a2b3', border: '#e4e7ec' };
 }
 
-// ── Main Page ───────────────────────────────────────────────────────────────
-
 export default function Compliance() {
-  const [frameworks, setFrameworks]       = useState<ComplianceFramework[]>([]);
-  const [loadingFw, setLoadingFw]         = useState(true);
-  const [fwError, setFwError]             = useState<string | null>(null);
-
-  const [selectedFwId, setSelectedFwId]   = useState<string | null>(null);
-  const [assessments, setAssessments]     = useState<ComplianceAssessment[]>([]);
-  const [loadingAss, setLoadingAss]       = useState(false);
-
-  const [runModalOpen, setRunModalOpen]   = useState(false);
+  const [frameworks, setFrameworks]     = useState<ComplianceFramework[]>([]);
+  const [loadingFw,  setLoadingFw]      = useState(true);
+  const [fwError,    setFwError]        = useState<string | null>(null);
+  const [selectedFwId, setSelectedFwId] = useState<string | null>(null);
+  const [assessments,  setAssessments]  = useState<ComplianceAssessment[]>([]);
+  const [loadingAss,   setLoadingAss]   = useState(false);
+  const [runModalOpen, setRunModalOpen] = useState(false);
   const [preselectedId, setPreselectedId] = useState<string | undefined>(undefined);
-
-  const [activeAssessment, setActiveAssessment] = useState<{
-    id: string; frameworkName: string; assessedBy: string;
-  } | null>(null);
-
+  const [activeAssessment, setActiveAssessment] = useState<{ id: string; frameworkName: string; assessedBy: string } | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
-  const showToast = (msg: string, ok = true) => {
-    setToast({ msg, ok });
-    setTimeout(() => setToast(null), 4000);
-  };
+  const showToast = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 4000); };
 
   const loadFrameworks = useCallback(async () => {
-    setLoadingFw(true);
-    setFwError(null);
-    try {
-      const data = await fetchFrameworks();
-      setFrameworks(data);
-    } catch (e) {
-      setFwError((e as Error).message);
-    } finally {
-      setLoadingFw(false);
-    }
+    setLoadingFw(true); setFwError(null);
+    try { setFrameworks(await fetchFrameworks()); }
+    catch (e) { setFwError((e as Error).message); }
+    finally   { setLoadingFw(false); }
   }, []);
 
   useEffect(() => { loadFrameworks(); }, [loadFrameworks]);
 
   const loadAssessments = useCallback(async (fwId: string) => {
     setLoadingAss(true);
-    try {
-      const data = await fetchAssessments(fwId);
-      setAssessments(data);
-    } catch {
-      setAssessments([]);
-    } finally {
-      setLoadingAss(false);
-    }
+    try { setAssessments(await fetchAssessments(fwId)); }
+    catch { setAssessments([]); }
+    finally { setLoadingAss(false); }
   }, []);
 
   const handleFrameworkClick = (fw: ComplianceFramework) => {
-    if (selectedFwId === fw.id) {
-      setSelectedFwId(null);
-      setAssessments([]);
-    } else {
-      setSelectedFwId(fw.id);
-      loadAssessments(fw.id);
-    }
+    if (selectedFwId === fw.id) { setSelectedFwId(null); setAssessments([]); }
+    else { setSelectedFwId(fw.id); loadAssessments(fw.id); }
   };
 
-  const handleRunAssessment = (preId?: string) => {
-    setPreselectedId(preId);
-    setRunModalOpen(true);
-  };
+  const handleRunAssessment = (preId?: string) => { setPreselectedId(preId); setRunModalOpen(true); };
 
   const handleStartAssessment = async (form: RunAssessmentForm) => {
     const controls = await fetchControls(form.framework_id);
     const assessmentId = await createAssessment(form, controls);
     const fw = frameworks.find(f => f.id === form.framework_id);
     setRunModalOpen(false);
-    setActiveAssessment({
-      id: assessmentId,
-      frameworkName: fw?.name ?? 'Unknown Framework',
-      assessedBy: form.assessed_by,
-    });
+    setActiveAssessment({ id: assessmentId, frameworkName: fw?.name ?? 'Unknown', assessedBy: form.assessed_by });
   };
 
-  /*const handleAssessmentComplete = async (score: number) => {
-    setActiveAssessment(null);
-    showToast(`Assessment completed! Overall score: ${score}%`);
-    await loadFrameworks();
-    if (selectedFwId) loadAssessments(selectedFwId);
-  };*/
-  
   const handleAssessmentComplete = async (score: number) => {
     setActiveAssessment(null);
     showToast(`Assessment completed! Overall score: ${score}%`);
@@ -166,221 +119,178 @@ export default function Compliance() {
     if (selectedFwId) loadAssessments(selectedFwId);
   };
 
-  const selectedFw = frameworks.find(f => f.id === selectedFwId);
-  const avgScore   = frameworks.length > 0
-    ? Math.round(frameworks.reduce((s, f) => s + f.score, 0) / frameworks.length)
-    : 0;
-  const totalControls   = frameworks.reduce((s, f) => s + f.controls_total, 0);
-  const totalCompliant  = frameworks.reduce((s, f) => s + f.controls_compliant, 0);
+  const selectedFw    = frameworks.find(f => f.id === selectedFwId);
+  const avgScore      = frameworks.length > 0 ? Math.round(frameworks.reduce((s, f) => s + f.score, 0) / frameworks.length) : 0;
+  const totalControls = frameworks.reduce((s, f) => s + f.controls_total, 0);
+  const totalCompliant = frameworks.reduce((s, f) => s + f.controls_compliant, 0);
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-screen-2xl">
-
-      {/* Toast */}
+    <div className="progrec-page p-4 p-lg-5">
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium transition-all ${
-          toast.ok
-            ? 'bg-emerald-900/90 border-emerald-500/30 text-emerald-300'
-            : 'bg-red-900/90 border-red-500/30 text-red-300'
-        }`}>
-          {toast.ok ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+        <div className={`pg-toast ${toast.ok ? '' : 'pg-toast-warning'}`}>
+          {toast.ok ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
           {toast.msg}
         </div>
       )}
 
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Header */}
+      <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
         <div>
-          <h2 className="text-slate-100 font-bold text-xl">Compliance Management</h2>
-          <p className="text-slate-500 text-sm">
+          <h5 className="fw-bold mb-0" style={{ color: '#101828' }}>Compliance Management</h5>
+          <span style={{ fontSize: '0.82rem', color: '#667085' }}>
             {frameworks.length} frameworks · {totalControls} controls · Average {avgScore}% compliant
-          </p>
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadFrameworks}
-            disabled={loadingFw}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800 text-sm transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={loadingFw ? 'animate-spin' : ''} />
-            Refresh
+        <div className="d-flex gap-2">
+          <button onClick={loadFrameworks} disabled={loadingFw} className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2">
+            <RefreshCw size={14} className={loadingFw ? 'spin' : ''} /> Refresh
           </button>
-          <button
-            onClick={() => handleRunAssessment()}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold text-sm transition-colors"
-          >
-            <PlayCircle size={15} />
-            Run Assessment
+          <button onClick={() => handleRunAssessment()} className="btn btn-sm btn-primary d-flex align-items-center gap-2">
+            <PlayCircle size={14} /> Run Assessment
           </button>
         </div>
       </div>
 
-      {/* Error banner */}
+      {/* Error */}
       {fwError && (
-        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
-          <AlertTriangle size={16} className="flex-shrink-0" />
-          {fwError}
+        <div className="d-flex align-items-center gap-2 mb-4 p-3 rounded" style={{ background: '#fff5f5', border: '1px solid #fecaca', color: '#d9534f', fontSize: '0.82rem' }}>
+          <AlertTriangle size={15} /> {fwError}
         </div>
       )}
 
-      {/* Summary cards */}
+      {/* Summary KPIs */}
       {!loadingFw && frameworks.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
+        <Row className="g-3 mb-4">
           {[
-            { label: 'Avg Compliance',     value: `${avgScore}%`,                      color: 'text-blue-400',    bg: 'bg-blue-500/10 border-blue-500/20' },
-            { label: 'Controls Compliant', value: `${totalCompliant}/${totalControls}`, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-            { label: 'Frameworks Active',  value: String(frameworks.length),            color: 'text-slate-300',   bg: 'bg-slate-500/10 border-slate-500/20' },
+            { label: 'Avg Compliance',     value: `${avgScore}%`,                       accent: '#3B82EC', cls: 'stat-card-primary' },
+            { label: 'Controls Compliant', value: `${totalCompliant}/${totalControls}`,  accent: '#4BBF73', cls: 'stat-card-success' },
+            { label: 'Frameworks Active',  value: String(frameworks.length),             accent: '#667085', cls: '' },
           ].map(s => (
-            <div key={s.label} className={`rounded-xl border p-4 ${s.bg}`}>
-              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-              <p className="text-slate-400 text-sm">{s.label}</p>
-            </div>
+            <Col key={s.label} xs={4}>
+              <Card className={`border shadow-sm h-100 ${s.cls}`} style={{ borderRadius: 10 }}>
+                <Card.Body className="p-3">
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: s.accent, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#667085' }}>{s.label}</div>
+                </Card.Body>
+              </Card>
+            </Col>
           ))}
-        </div>
+        </Row>
       )}
 
       {/* Loading skeleton */}
       {loadingFw && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <Row className="g-3 mb-4">
           {[1,2,3,4,5,6].map(i => (
-            <div key={i} className="bg-slate-800/40 border border-slate-700/30 rounded-xl p-5 animate-pulse h-40" />
+            <Col key={i} xs={12} md={6} xl={4}>
+              <div className="rounded p-4" style={{ background: '#f9fafb', border: '1px solid #e4e7ec', height: 140 }} />
+            </Col>
           ))}
-        </div>
+        </Row>
       )}
 
       {/* Framework cards */}
       {!loadingFw && frameworks.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <Row className="g-3 mb-4">
           {frameworks.map(fw => {
             const active = selectedFwId === fw.id;
+            const cs = categoryStyle(fw.category);
             return (
-              <div
-                key={fw.id}
-                className={`bg-slate-800/50 border rounded-xl overflow-hidden transition-all ${
-                  active ? 'border-cyan-500/50 bg-cyan-500/5' : 'border-slate-700/50 hover:border-slate-600'
-                }`}
-              >
-                <button
-                  className="w-full text-left p-5"
-                  onClick={() => handleFrameworkClick(fw)}
-                >
-                  <div className="flex items-center gap-4 mb-4">
-                    <ScoreRing score={fw.score} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="text-slate-100 font-semibold">{fw.name}</h3>
-                        <span className={`text-xs px-2 py-0.5 rounded border ${categoryColors[fw.category] ?? ''}`}>{fw.category}</span>
+              <Col key={fw.id} xs={12} md={6} xl={4}>
+                <Card className="h-100 shadow-sm" style={{
+                  borderRadius: 10, border: active ? '2px solid #3B82EC' : '1px solid #e4e7ec',
+                  background: active ? '#f8faff' : '#fff', cursor: 'pointer', transition: 'all 0.15s',
+                }}>
+                  <button className="border-0 bg-transparent w-100 text-start p-4" onClick={() => handleFrameworkClick(fw)}>
+                    <div className="d-flex align-items-center gap-3 mb-3">
+                      <ScoreRing score={fw.score} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="d-flex align-items-center flex-wrap gap-2 mb-1">
+                          <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#101828' }}>{fw.name}</span>
+                          <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: 6, background: cs.bg, color: cs.color, border: `1px solid ${cs.border}` }}>{fw.category}</span>
+                        </div>
+                        <span style={{ fontSize: '0.72rem', color: '#98a2b3' }}>v{fw.version} · {fw.controls_total} controls</span>
+                        <ChevronRight size={13} color={active ? '#3B82EC' : '#98a2b3'} style={{ display: 'block', marginTop: 4, transform: active ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
                       </div>
-                      <p className="text-slate-500 text-xs">v{fw.version} · {fw.controls_total} controls</p>
-                      <ChevronRight size={14} className={`text-slate-600 mt-1 transition-transform ${active ? 'rotate-90 text-cyan-400' : ''}`} />
                     </div>
-                  </div>
-                  <ControlBar compliant={fw.controls_compliant} partial={fw.controls_partial} noncompliant={fw.controls_noncompliant} />
-                  <div className="flex justify-between mt-2 text-xs">
-                    <span className="flex items-center gap-1 text-emerald-400"><CheckCircle size={12} /> {fw.controls_compliant}</span>
-                    <span className="flex items-center gap-1 text-amber-400"><MinusCircle size={12} /> {fw.controls_partial}</span>
-                    <span className="flex items-center gap-1 text-red-400"><XCircle size={12} /> {fw.controls_noncompliant}</span>
-                  </div>
-                </button>
-
-                {/* Run assessment shortcut */}
-                <div className="px-5 pb-4 pt-0">
-                  <button
-                    onClick={() => handleRunAssessment(fw.id)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/8 text-cyan-400 hover:bg-cyan-500/15 text-xs font-medium transition-colors"
-                  >
-                    <PlayCircle size={12} /> Run Assessment
+                    <ControlBar compliant={fw.controls_compliant} partial={fw.controls_partial} noncompliant={fw.controls_noncompliant} />
+                    <div className="d-flex justify-content-between mt-2" style={{ fontSize: '0.72rem' }}>
+                      <span className="d-flex align-items-center gap-1" style={{ color: '#4BBF73' }}><CheckCircle size={11} /> {fw.controls_compliant}</span>
+                      <span className="d-flex align-items-center gap-1" style={{ color: '#f0ad4e' }}><MinusCircle size={11} /> {fw.controls_partial}</span>
+                      <span className="d-flex align-items-center gap-1" style={{ color: '#d9534f' }}><XCircle size={11} /> {fw.controls_noncompliant}</span>
+                    </div>
                   </button>
-                </div>
-              </div>
+                  <div className="px-4 pb-4">
+                    <button onClick={() => handleRunAssessment(fw.id)} className="btn btn-sm btn-outline-primary w-100 d-flex align-items-center justify-content-center gap-2" style={{ fontSize: '0.75rem' }}>
+                      <PlayCircle size={12} /> Run Assessment
+                    </button>
+                  </div>
+                </Card>
+              </Col>
             );
           })}
-        </div>
+        </Row>
       )}
 
-      {/* Assessment history panel */}
+      {/* Assessment history */}
       {selectedFwId && selectedFw && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-700/50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ClipboardList size={16} className="text-slate-400" />
-              <h3 className="text-slate-100 font-semibold">{selectedFw.name} — Assessment History</h3>
-            </div>
-            <button
-              onClick={() => handleRunAssessment(selectedFwId)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold text-xs transition-colors"
-            >
+        <Card className="shadow-sm border-0" style={{ borderRadius: 10, overflow: 'hidden' }}>
+          <Card.Header className="bg-white d-flex align-items-center justify-content-between px-4 py-3" style={{ borderBottom: '1px solid #e4e7ec' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#101828' }}>{selectedFw.name} — Assessment History</div>
+            <button onClick={() => handleRunAssessment(selectedFwId)} className="btn btn-sm btn-primary d-flex align-items-center gap-2">
               <PlayCircle size={12} /> New Assessment
             </button>
-          </div>
+          </Card.Header>
 
           {loadingAss ? (
-            <div className="px-5 py-8 text-center">
-              <RefreshCw size={20} className="animate-spin text-cyan-500 mx-auto" />
-            </div>
+            <div className="py-5 text-center"><RefreshCw size={20} color="#3B82EC" className="spin" /></div>
           ) : assessments.length === 0 ? (
-            <div className="px-5 py-10 text-center">
-              <ClipboardList size={32} className="text-slate-700 mx-auto mb-3" />
-              <p className="text-slate-500 text-sm">No assessments yet for {selectedFw.name}</p>
-              <p className="text-slate-600 text-xs mt-1">Run your first assessment to track compliance posture over time</p>
+            <div className="py-5 text-center">
+              <div style={{ color: '#98a2b3', fontSize: '0.88rem', fontWeight: 500 }}>No assessments yet for {selectedFw.name}</div>
+              <div style={{ color: '#b0b8c4', fontSize: '0.78rem', marginTop: 4 }}>Run your first assessment to track posture over time</div>
             </div>
           ) : (
-            <div className="divide-y divide-slate-700/30">
-              {assessments.map(a => (
-                <div key={a.id} className="px-5 py-4 flex items-center gap-4 hover:bg-slate-800/30 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${statusBadge(a.status)}`}>
-                        {a.status === 'in_progress' ? 'In Progress' : a.status === 'completed' ? 'Completed' : 'Cancelled'}
-                      </span>
-                      {a.notes && <span className="text-slate-500 text-xs truncate max-w-xs">{a.notes}</span>}
+            <div>
+              {assessments.map(a => {
+                const scs = statusChipStyle(a.status);
+                return (
+                  <div key={a.id} className="d-flex align-items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid #f4f7f9' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="d-flex align-items-center flex-wrap gap-2 mb-1">
+                        <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: 20, background: scs.bg, color: scs.color, border: `1px solid ${scs.border}`, fontWeight: 500 }}>
+                          {a.status === 'in_progress' ? 'In Progress' : a.status === 'completed' ? 'Completed' : 'Cancelled'}
+                        </span>
+                        {a.notes && <span style={{ color: '#667085', fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{a.notes}</span>}
+                      </div>
+                      <div className="d-flex align-items-center flex-wrap gap-3" style={{ fontSize: '0.75rem', color: '#98a2b3' }}>
+                        <span className="d-flex align-items-center gap-1"><User size={11} /> {a.assessed_by}</span>
+                        <span className="d-flex align-items-center gap-1"><Calendar size={11} /> {fmtDate(a.started_at)}</span>
+                        {a.completed_at && <span className="d-flex align-items-center gap-1"><Clock size={11} /> {fmtTime(a.completed_at)}</span>}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
-                      <span className="flex items-center gap-1"><User size={11} /> {a.assessed_by}</span>
-                      <span className="flex items-center gap-1"><Calendar size={11} /> {fmtDate(a.started_at)}</span>
-                      {a.completed_at && (
-                        <span className="flex items-center gap-1"><Clock size={11} /> Completed {fmtTime(a.completed_at)}</span>
+                    <div className="text-end flex-shrink-0">
+                      {a.overall_score != null ? (
+                        <div>
+                          <div style={{ fontSize: '1.2rem', fontWeight: 700, color: a.overall_score >= 80 ? '#4BBF73' : a.overall_score >= 60 ? '#f0ad4e' : '#d9534f', fontVariantNumeric: 'tabular-nums' }}>{a.overall_score}%</div>
+                          <div style={{ fontSize: '0.68rem', color: '#98a2b3' }}>overall</div>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#98a2b3', fontSize: '0.78rem' }}>pending</span>
                       )}
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    {a.overall_score != null ? (
-                      <div>
-                        <p className={`text-lg font-bold tabular-nums ${
-                          a.overall_score >= 80 ? 'text-emerald-400' :
-                          a.overall_score >= 60 ? 'text-amber-400' : 'text-red-400'
-                        }`}>{a.overall_score}%</p>
-                        <p className="text-slate-600 text-xs">overall</p>
-                      </div>
-                    ) : (
-                      <span className="text-slate-600 text-xs">pending</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
-        </div>
+        </Card>
       )}
 
-      {/* Modals & panels */}
       {runModalOpen && (
-        <RunAssessmentModal
-          frameworks={frameworks}
-          preselectedId={preselectedId}
-          onClose={() => setRunModalOpen(false)}
-          onStart={handleStartAssessment}
-        />
+        <RunAssessmentModal frameworks={frameworks} preselectedId={preselectedId} onClose={() => setRunModalOpen(false)} onStart={handleStartAssessment} />
       )}
-
       {activeAssessment && (
-        <AssessmentReviewPanel
-          assessmentId={activeAssessment.id}
-          frameworkName={activeAssessment.frameworkName}
-          assessedBy={activeAssessment.assessedBy}
-          onClose={() => setActiveAssessment(null)}
-          onComplete={handleAssessmentComplete}
-        />
+        <AssessmentReviewPanel assessmentId={activeAssessment.id} frameworkName={activeAssessment.frameworkName} assessedBy={activeAssessment.assessedBy} onClose={() => setActiveAssessment(null)} onComplete={handleAssessmentComplete} />
       )}
     </div>
   );

@@ -1,17 +1,14 @@
 import { useState } from 'react';
-import {
-  Plus, Search, ChevronDown, Download, Upload,
-  Globe, Hash, Link2, Mail, FileCode, HardDrive, Key,
-  CheckCircle2, Fingerprint,
-} from 'lucide-react';
+import { Plus, Search, Download, Upload, Globe, Hash, Link2, Mail, File, HardDrive, Key, Target, CheckCircle } from 'react-feather';
+import { Card, Form, InputGroup, Table } from 'react-bootstrap';
 import { useIOCStore, iocStore } from '../lib/iocStore';
 import type { IOC } from '../lib/types';
 import AddIOCModal from '../components/AddIOCModal';
 import ImportIOCCSVModal from '../components/ImportIOCCSVModal';
 
-const TYPES     = ['All', 'IP', 'Domain', 'URL', 'Hash', 'Email', 'File', 'Registry', 'Certificate'];
+const TYPES      = ['All', 'IP', 'Domain', 'URL', 'Hash', 'Email', 'File', 'Registry', 'Certificate'];
 const SEVERITIES = ['All', 'Critical', 'High', 'Medium', 'Low'];
-const STATUSES  = ['All', 'Active', 'Inactive', 'Under Review', 'Whitelisted'];
+const STATUSES   = ['All', 'Active', 'Inactive', 'Under Review', 'Whitelisted'];
 
 const typeIcon = (type: string) => {
   switch (type) {
@@ -20,96 +17,82 @@ const typeIcon = (type: string) => {
     case 'URL':         return Link2;
     case 'Hash':        return Hash;
     case 'Email':       return Mail;
-    case 'File':        return FileCode;
+    case 'File':        return File;
     case 'Registry':    return HardDrive;
     case 'Certificate': return Key;
-    default:            return Fingerprint;
+    default:            return Target;
   }
 };
 
-const typeColor = (type: string) => {
+const typeStyle = (type: string) => {
   switch (type) {
-    case 'IP':          return 'text-blue-400 bg-blue-500/10';
-    case 'Domain':      return 'text-cyan-400 bg-cyan-500/10';
-    case 'URL':         return 'text-violet-400 bg-violet-500/10';
-    case 'Hash':        return 'text-amber-400 bg-amber-500/10';
-    case 'Email':       return 'text-pink-400 bg-pink-500/10';
-    case 'File':        return 'text-orange-400 bg-orange-500/10';
-    case 'Registry':    return 'text-slate-400 bg-slate-600/20';
-    case 'Certificate': return 'text-teal-400 bg-teal-500/10';
-    default:            return 'text-slate-400 bg-slate-700/30';
+    case 'IP':          return { bg: '#eff6ff', color: '#3B82EC', border: '#bfdbfe' };
+    case 'Domain':      return { bg: '#ecfeff', color: '#0e7490', border: '#a5f3fc' };
+    case 'URL':         return { bg: '#f5f3ff', color: '#6f42c1', border: '#ddd6fe' };
+    case 'Hash':        return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
+    case 'Email':       return { bg: '#fdf2f8', color: '#be185d', border: '#fbcfe8' };
+    case 'File':        return { bg: '#fff7ed', color: '#fd7e14', border: '#fed7aa' };
+    case 'Registry':    return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
+    case 'Certificate': return { bg: '#f0fdfa', color: '#0f766e', border: '#99f6e4' };
+    default:            return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
   }
 };
 
-const sevColor = (s: string) => {
-  switch (s) {
-    case 'Critical': return 'bg-red-500/15 text-red-400 border-red-500/30';
-    case 'High':     return 'bg-orange-500/15 text-orange-400 border-orange-500/30';
-    case 'Medium':   return 'bg-amber-500/15 text-amber-400 border-amber-500/30';
-    case 'Low':      return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
-    default:         return 'bg-slate-700 text-slate-400 border-slate-600';
-  }
+const sevStyle = (s: string) => {
+  if (s === 'Critical') return { bg: '#fff5f5', color: '#d9534f', border: '#fecaca' };
+  if (s === 'High')     return { bg: '#fff7ed', color: '#fd7e14', border: '#fed7aa' };
+  if (s === 'Medium')   return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
+  if (s === 'Low')      return { bg: '#f0fdf4', color: '#4BBF73', border: '#bbf7d0' };
+  return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
 };
 
-const statusColor = (s: string) => {
-  switch (s) {
-    case 'Active':       return 'bg-red-500/15 text-red-400 border-red-500/30';
-    case 'Under Review': return 'bg-amber-500/15 text-amber-400 border-amber-500/30';
-    case 'Inactive':     return 'bg-slate-700/50 text-slate-500 border-slate-600/40';
-    case 'Whitelisted':  return 'bg-emerald-500/15 text-slate-400 border-emerald-500/20';
-    default:             return 'bg-slate-700 text-slate-400 border-slate-600';
-  }
+const statusStyle = (s: string) => {
+  if (s === 'Active')       return { bg: '#fff5f5', color: '#d9534f', border: '#fecaca' };
+  if (s === 'Under Review') return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
+  if (s === 'Inactive')     return { bg: '#f9fafb', color: '#98a2b3', border: '#e4e7ec' };
+  if (s === 'Whitelisted')  return { bg: '#f0fdf4', color: '#4BBF73', border: '#bbf7d0' };
+  return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
 };
 
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const h = Math.floor(diff / 3600000);
-  if (h < 1) return 'just now';
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+function Chip({ text, style }: { text: string; style: { bg: string; color: string; border: string } }) {
+  return (
+    <span style={{ display: 'inline-block', fontSize: '0.72rem', padding: '2px 8px', borderRadius: 6, background: style.bg, color: style.color, border: `1px solid ${style.border}`, fontWeight: 500, whiteSpace: 'nowrap' }}>
+      {text}
+    </span>
+  );
 }
 
 function ConfidenceBar({ value }: { value: number }) {
-  const color = value >= 80 ? 'bg-emerald-500' : value >= 50 ? 'bg-amber-500' : 'bg-red-500';
-  const text  = value >= 80 ? 'text-emerald-400' : value >= 50 ? 'text-amber-400' : 'text-red-400';
+  const color = value >= 80 ? '#4BBF73' : value >= 50 ? '#f0ad4e' : '#d9534f';
   return (
-    <div className="flex items-center gap-2">
-      <div className="w-14 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} />
+    <div className="d-flex align-items-center gap-2">
+      <div style={{ width: 52, height: 6, background: '#f0f0f0', borderRadius: 999, overflow: 'hidden', flexShrink: 0 }}>
+        <div style={{ height: '100%', borderRadius: 999, background: color, width: `${value}%` }} />
       </div>
-      <span className={`text-xs font-bold tabular-nums ${text}`}>{value}%</span>
+      <span style={{ fontSize: '0.72rem', fontWeight: 700, color, fontVariantNumeric: 'tabular-nums', minWidth: 28 }}>{value}%</span>
     </div>
   );
 }
 
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const h = Math.floor(diff / 3600000);
+  if (h < 1)  return 'just now';
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 function exportToCSV(iocs: IOC[]) {
-  const headers = ['ID','Value','Type','Severity','Status','Confidence','Source','Threat Actor','Tags','First Seen','Last Seen','Expiry Date','Related Incident','Description'];
-  const rows = iocs.map(i => [
-    i.id,
-    `"${i.value.replace(/"/g, '""')}"`,
-    i.type, i.severity, i.status, i.confidence,
-    `"${i.source}"`,
-    `"${i.threat_actor}"`,
-    `"${i.tags.join('; ')}"`,
-    i.first_seen, i.last_seen, i.expiry_date, i.related_incident,
-    `"${(i.description || '').replace(/"/g, '""')}"`,
-  ]);
-  const csv  = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const headers = ['ID','Value','Type','Severity','Status','Confidence','Source','Threat Actor','Tags','First Seen','Last Seen'];
+  const rows = iocs.map(i => [i.id, `"${i.value.replace(/"/g,'""')}"`, i.type, i.severity, i.status, i.confidence, `"${i.source}"`, `"${i.threat_actor}"`, `"${i.tags.join('; ')}"`, i.first_seen, i.last_seen]);
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url;
-  a.download = `ioc-register-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `ioc-register-${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
 export default function IOCPage() {
-  // ── Use shared store — reflects additions from Threats page instantly ──────
   const iocs = useIOCStore();
-
   const [search,       setSearch]       = useState('');
   const [typeFilter,   setTypeFilter]   = useState('All');
   const [sevFilter,    setSevFilter]    = useState('All');
@@ -118,10 +101,7 @@ export default function IOCPage() {
   const [importOpen,   setImportOpen]   = useState(false);
   const [toast,        setToast]        = useState<string | null>(null);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 4000);
-  };
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
 
   const handleAdd = (ioc: IOC) => {
     const added = iocStore.add(ioc);
@@ -135,15 +115,11 @@ export default function IOCPage() {
   };
 
   const filtered = iocs.filter(i => {
-    const matchSearch =
-      i.value.toLowerCase().includes(search.toLowerCase()) ||
-      i.source.toLowerCase().includes(search.toLowerCase()) ||
-      i.threat_actor.toLowerCase().includes(search.toLowerCase()) ||
-      i.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
-    const matchType   = typeFilter   === 'All' || i.type     === typeFilter;
-    const matchSev    = sevFilter    === 'All' || i.severity === sevFilter;
-    const matchStatus = statusFilter === 'All' || i.status   === statusFilter;
-    return matchSearch && matchType && matchSev && matchStatus;
+    const q = search.toLowerCase();
+    return (i.value.toLowerCase().includes(q) || i.source.toLowerCase().includes(q) || i.threat_actor.toLowerCase().includes(q) || i.tags.some(t => t.toLowerCase().includes(q))) &&
+      (typeFilter   === 'All' || i.type     === typeFilter) &&
+      (sevFilter    === 'All' || i.severity === sevFilter) &&
+      (statusFilter === 'All' || i.status   === statusFilter);
   });
 
   const stats = {
@@ -154,184 +130,130 @@ export default function IOCPage() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-screen-2xl relative">
-
+    <div className="progrec-page p-4 p-lg-5">
       {addOpen    && <AddIOCModal       onClose={() => setAddOpen(false)}    onSubmit={handleAdd}    />}
       {importOpen && <ImportIOCCSVModal onClose={() => setImportOpen(false)} onImport={handleImport} />}
-
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm px-4 py-3 rounded-xl shadow-xl backdrop-blur">
-          <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
-          {toast}
-        </div>
-      )}
+      {toast && <div className="pg-toast"><span className="live-dot" />{toast}</div>}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
         <div>
-          <h2 className="text-slate-100 font-bold text-xl">IOC Register</h2>
-          <p className="text-slate-500 text-sm">{iocs.length} indicators tracked · Last updated today</p>
+          <h5 className="fw-bold mb-0" style={{ color: '#101828' }}>IOC Register</h5>
+          <span style={{ fontSize: '0.82rem', color: '#667085' }}>{iocs.length} indicators tracked · Last updated today</span>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => exportToCSV(filtered)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800 text-sm transition-colors"
-          >
-            <Download size={15} /> Export {filtered.length !== iocs.length ? `(${filtered.length})` : ''}
+        <div className="d-flex gap-2">
+          <button onClick={() => exportToCSV(filtered)} className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2">
+            <Download size={14} /> Export {filtered.length !== iocs.length ? `(${filtered.length})` : ''}
           </button>
-          <button
-            onClick={() => setImportOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800 text-sm transition-colors"
-          >
-            <Upload size={15} /> Import CSV
+          <button onClick={() => setImportOpen(true)} className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2">
+            <Upload size={14} /> Import CSV
           </button>
-          <button
-            onClick={() => setAddOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold text-sm transition-colors"
-          >
-            <Plus size={16} /> Add IOC
+          <button onClick={() => setAddOpen(true)} className="btn btn-sm btn-primary d-flex align-items-center gap-2">
+            <Plus size={14} /> Add IOC
           </button>
         </div>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="row g-3 mb-4">
         {[
-          { label: 'Total IOCs',   value: stats.total,    color: 'text-blue-400',   bg: 'bg-blue-500/10 border-blue-500/20'     },
-          { label: 'Critical',     value: stats.critical, color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20'       },
-          { label: 'Active',       value: stats.active,   color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
-          { label: 'Under Review', value: stats.review,   color: 'text-amber-400',  bg: 'bg-amber-500/10 border-amber-500/20'   },
+          { label: 'Total IOCs',   value: stats.total,    accent: '#3B82EC', cls: 'stat-card-primary' },
+          { label: 'Critical',     value: stats.critical, accent: '#d9534f', cls: 'stat-card-danger'  },
+          { label: 'Active',       value: stats.active,   accent: '#fd7e14', cls: 'stat-card-warning' },
+          { label: 'Under Review', value: stats.review,   accent: '#f0ad4e', cls: 'stat-card-warning' },
         ].map(s => (
-          <div key={s.label} className={`rounded-xl border p-4 ${s.bg}`}>
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-slate-400 text-sm">{s.label}</p>
+          <div key={s.label} className="col-6 col-md-3">
+            <Card className={`border shadow-sm h-100 ${s.cls}`} style={{ borderRadius: 10 }}>
+              <Card.Body className="p-3">
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: s.accent, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+                <div style={{ fontSize: '0.78rem', color: '#667085' }}>{s.label}</div>
+              </Card.Body>
+            </Card>
           </div>
         ))}
       </div>
 
-      {/* IOC type distribution */}
-      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+      {/* IOC type distribution grid */}
+      <div className="row g-2 mb-4">
         {(['IP','Domain','URL','Hash','Email','File','Registry','Certificate'] as IOC['type'][]).map(t => {
           const count  = iocs.filter(i => i.type === t).length;
           const Icon   = typeIcon(t);
-          const colors = typeColor(t);
+          const ts     = typeStyle(t);
+          const active = typeFilter === t;
           return (
-            <button
-              key={t}
-              onClick={() => setTypeFilter(typeFilter === t ? 'All' : t)}
-              className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border transition-all text-center ${
-                typeFilter === t
-                  ? `${colors} border-current/30 ring-1 ring-current`
-                  : 'bg-slate-800/50 border-slate-700/50 hover:border-slate-600 text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              <Icon size={16} />
-              <span className="text-xs font-semibold">{t}</span>
-              <span className="text-xs tabular-nums font-bold">{count}</span>
-            </button>
+            <div key={t} className="col-3 col-sm-auto" style={{ flex: '1 1 80px' }}>
+              <button
+                onClick={() => setTypeFilter(typeFilter === t ? 'All' : t)}
+                className="w-100 d-flex flex-column align-items-center gap-1 p-2 rounded"
+                style={{
+                  border: active ? `2px solid ${ts.color}` : '1px solid #e4e7ec',
+                  background: active ? ts.bg : '#fff',
+                  cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center',
+                }}
+              >
+                <Icon size={16} color={active ? ts.color : '#667085'} />
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: active ? ts.color : '#667085' }}>{t}</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: active ? ts.color : '#344054', fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+              </button>
+            </div>
           );
         })}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2 flex-1">
-          <Search size={16} className="text-slate-500" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by value, source, actor, or tag..."
-            className="bg-transparent text-slate-300 text-sm outline-none flex-1 placeholder:text-slate-600"
-          />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { value: sevFilter,    set: setSevFilter,    options: SEVERITIES, placeholder: 'Severity' },
-            { value: statusFilter, set: setStatusFilter, options: STATUSES,   placeholder: 'Status'   },
-          ].map(({ value, set, options, placeholder }) => (
-            <div key={placeholder} className="relative">
-              <select
-                value={value}
-                onChange={e => set(e.target.value)}
-                className="appearance-none bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 pr-8 outline-none focus:border-cyan-500 cursor-pointer"
-              >
-                {options.map(o => <option key={o}>{o}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-2 top-3 text-slate-500 pointer-events-none" />
-            </div>
-          ))}
-        </div>
+      <div className="d-flex flex-wrap gap-2 mb-4">
+        <InputGroup style={{ maxWidth: 320, flex: '1 1 200px' }}>
+          <InputGroup.Text className="bg-white border-end-0"><Search size={14} color="#98a2b3" /></InputGroup.Text>
+          <Form.Control value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by value, source, actor, or tag…" style={{ fontSize: '0.82rem', borderLeft: 0 }} />
+        </InputGroup>
+        <Form.Select value={sevFilter}    onChange={e => setSevFilter(e.target.value)}    style={{ maxWidth: 130, fontSize: '0.82rem' }}>{SEVERITIES.map(o => <option key={o}>{o}</option>)}</Form.Select>
+        <Form.Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ maxWidth: 150, fontSize: '0.82rem' }}>{STATUSES.map(o => <option key={o}>{o}</option>)}</Form.Select>
       </div>
 
       {/* Table */}
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-700/50">
+      <Card className="shadow-sm border-0" style={{ borderRadius: 10, overflow: 'hidden' }}>
+        <div className="table-responsive">
+          <Table hover className="mb-0" style={{ fontSize: '0.82rem' }}>
+            <thead style={{ background: '#f9fafb' }}>
+              <tr>
                 {['Indicator','Type','Severity','Confidence','Source','Threat Actor','Status','Last Seen',''].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-4 py-3 border-bottom fw-semibold" style={{ fontSize: '0.72rem', color: '#98a2b3', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/30">
+            <tbody>
               {filtered.map(ioc => {
-                const Icon   = typeIcon(ioc.type);
-                const tc     = typeColor(ioc.type);
-                const isNew  = !ioc.id.startsWith('mock') && Date.now() - new Date(ioc.first_seen).getTime() < 10 * 60 * 1000;
+                const Icon  = typeIcon(ioc.type);
+                const ts    = typeStyle(ioc.type);
+                const isNew = !ioc.id.startsWith('mock') && Date.now() - new Date(ioc.first_seen).getTime() < 10 * 60 * 1000;
                 return (
-                  <tr key={ioc.id} className="hover:bg-slate-800/40 transition-colors group">
-                    <td className="px-4 py-3 max-w-xs">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${tc}`}>
-                          <Icon size={14} />
+                  <tr key={ioc.id} className="align-middle">
+                    <td className="px-4 py-3" style={{ maxWidth: 260 }}>
+                      <div className="d-flex align-items-center gap-2">
+                        <div className="d-flex align-items-center justify-content-center rounded flex-shrink-0" style={{ width: 28, height: 28, background: ts.bg, border: `1px solid ${ts.border}` }}>
+                          <Icon size={13} color={ts.color} />
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-slate-200 font-mono text-xs truncate max-w-[200px]">{ioc.value}</p>
-                            {isNew && (
-                              <span className="text-xs bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 px-1.5 py-px rounded flex-shrink-0">New</span>
-                            )}
+                        <div style={{ minWidth: 0 }}>
+                          <div className="d-flex align-items-center gap-1">
+                            <span style={{ color: '#344054', fontFamily: 'monospace', fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{ioc.value}</span>
+                            {isNew && <span style={{ fontSize: '0.65rem', background: '#eff6ff', color: '#3B82EC', border: '1px solid #bfdbfe', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>New</span>}
                           </div>
-                          <div className="flex gap-1 mt-0.5 flex-wrap">
-                            {ioc.tags.slice(0, 2).map(t => (
-                              <span key={t} className="text-[10px] bg-slate-700/50 text-slate-500 px-1.5 py-0.5 rounded">{t}</span>
-                            ))}
+                          <div className="d-flex gap-1 mt-1 flex-wrap">
+                            {ioc.tags.slice(0,2).map(t => <span key={t} style={{ fontSize: '0.65rem', background: '#f4f7f9', border: '1px solid #e4e7ec', borderRadius: 4, padding: '1px 5px', color: '#667085' }}>{t}</span>)}
                           </div>
                         </div>
                       </div>
                     </td>
+                    <td className="px-4 py-3"><Chip text={ioc.type} style={ts} /></td>
+                    <td className="px-4 py-3"><Chip text={ioc.severity} style={sevStyle(ioc.severity)} /></td>
+                    <td className="px-4 py-3" style={{ minWidth: 110 }}><ConfidenceBar value={ioc.confidence} /></td>
+                    <td className="px-4 py-3"><span style={{ color: '#667085', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{ioc.source}</span></td>
+                    <td className="px-4 py-3"><span style={{ color: '#667085', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{ioc.threat_actor}</span></td>
+                    <td className="px-4 py-3"><Chip text={ioc.status} style={statusStyle(ioc.status)} /></td>
+                    <td className="px-4 py-3"><span style={{ color: '#98a2b3', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{timeAgo(ioc.last_seen)}</span></td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${tc}`}>{ioc.type}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${sevColor(ioc.severity)}`}>{ioc.severity}</span>
-                    </td>
-                    <td className="px-4 py-3 min-w-[110px]">
-                      <ConfidenceBar value={ioc.confidence} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-slate-400 text-xs whitespace-nowrap">{ioc.source}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-slate-400 text-xs whitespace-nowrap">{ioc.threat_actor}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded border whitespace-nowrap ${statusColor(ioc.status)}`}>
-                        {ioc.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-slate-500 text-xs whitespace-nowrap">{timeAgo(ioc.last_seen)}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => {
-                          iocStore.remove(ioc.id);
-                          showToast(`IOC "${ioc.value}" removed`);
-                        }}
-                        className="text-slate-600 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-all"
-                      >
+                      <button onClick={() => { iocStore.remove(ioc.id); showToast(`IOC "${ioc.value}" removed`); }}
+                        className="btn btn-sm btn-link p-0 text-danger opacity-0 show-on-hover" style={{ fontSize: '0.72rem' }}>
                         Remove
                       </button>
                     </td>
@@ -339,12 +261,10 @@ export default function IOCPage() {
                 );
               })}
             </tbody>
-          </table>
+          </Table>
         </div>
-        {filtered.length === 0 && (
-          <div className="py-16 text-center text-slate-500">No IOCs match the current filters.</div>
-        )}
-      </div>
+        {filtered.length === 0 && <div className="py-5 text-center" style={{ color: '#98a2b3' }}>No IOCs match the current filters.</div>}
+      </Card>
     </div>
   );
 }

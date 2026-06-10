@@ -1,17 +1,8 @@
 import {
-  LayoutDashboard,
-  ShieldAlert,
-  Zap,
-  Bug,
-  Server,
-  Crosshair,
-  AlertCircle,
-  CheckSquare,
-  BarChart2,
-  Settings,
-  ChevronRight,
-  Shield,
-} from 'lucide-react';
+  Grid, AlertOctagon, Zap, Activity, Server,
+  Crosshair, AlertCircle, CheckSquare, BarChart2,
+  Settings, ChevronRight, Shield,
+} from 'react-feather';
 import type { NavPage } from '../lib/types';
 
 interface SidebarProps {
@@ -21,90 +12,91 @@ interface SidebarProps {
 }
 
 const navItems: { id: NavPage; label: string; icon: React.ElementType; badge?: number }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'risks', label: 'Risk Register', icon: ShieldAlert, badge: 12 },
-  { id: 'threats', label: 'Threat Intelligence', icon: Zap, badge: 6 },
-  { id: 'vulnerabilities', label: 'Vulnerabilities', icon: Bug, badge: 4 },
-  { id: 'assets', label: 'Asset Inventory', icon: Server },
-  { id: 'ioc', label: 'IOC Register', icon: Crosshair, badge: 12 },
-  { id: 'incidents', label: 'Incidents', icon: AlertCircle, badge: 7 },
-  { id: 'compliance', label: 'Compliance', icon: CheckSquare },
-  { id: 'reports', label: 'Reports', icon: BarChart2 },
-  { id: 'settings', label: 'Settings', icon: Settings },
-  { id: 'wazuh', label: 'Wazuh SIEM', icon:  Shield},
+  { id: 'dashboard',       label: 'Dashboard',           icon: Grid },
+  { id: 'risks',           label: 'Risk Register',        icon: AlertOctagon, badge: 12 },
+  { id: 'threats',         label: 'Threat Intelligence',  icon: Zap,          badge: 6  },
+  { id: 'vulnerabilities', label: 'Vulnerabilities',      icon: Activity,     badge: 4  },
+  { id: 'assets',          label: 'Asset Inventory',      icon: Server },
+  { id: 'ioc',             label: 'IOC Register',         icon: Crosshair,    badge: 12 },
+  { id: 'incidents',       label: 'Incidents',            icon: AlertCircle,  badge: 7  },
+  { id: 'compliance',      label: 'Compliance',           icon: CheckSquare },
+  { id: 'reports',         label: 'Reports',              icon: BarChart2 },
+  { id: 'settings',        label: 'Settings',             icon: Settings },
+  { id: 'wazuh',           label: 'Wazuh SIEM',           icon: Shield },
 ];
 
 export default function Sidebar({ activePage, onNavigate, collapsed }: SidebarProps) {
   return (
-    <aside
-      className={`flex flex-col bg-slate-900 border-r border-slate-800 transition-all duration-300 ${
-        collapsed ? 'w-16' : 'w-60'
-      } min-h-screen`}
-    >
-      {/* Logo */}
-      <div className={`flex items-center gap-3 px-4 py-5 border-b border-slate-800 ${collapsed ? 'justify-center' : ''}`}>
-        <div className="flex-shrink-0 w-8 h-8 bg-cyan-500 rounded-lg flex items-center justify-center">
-          <Shield size={18} className="text-slate-900" />
+    <>
+      <style>{`
+        .pg-sidebar { font-family:'Poppins',sans-serif; background:#fff; border-right:1px solid #e4e7ec; min-height:100vh; display:flex; flex-direction:column; transition:width 0.25s; }
+        .pg-sidebar-wide { width:220px; }
+        .pg-sidebar-narrow { width:60px; }
+        .pg-logo-area { display:flex; align-items:center; gap:10px; padding:18px 16px; border-bottom:1px solid #e4e7ec; }
+        .pg-logo-icon { width:34px; height:34px; background:#3B82EC; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .pg-logo-title { font-size:0.85rem; font-weight:700; color:#101828; line-height:1.2; }
+        .pg-logo-sub { font-size:0.68rem; color:#667085; }
+        .pg-nav { flex:1; padding:12px 8px; }
+        .pg-nav-btn { width:100%; display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; border:none; background:transparent; cursor:pointer; font-family:'Poppins',sans-serif; font-size:0.8rem; font-weight:500; color:#667085; transition:background 0.15s,color 0.15s; text-align:left; margin-bottom:2px; position:relative; }
+        .pg-nav-btn:hover { background:#f4f7f9; color:#101828; }
+        .pg-nav-btn.active { background:#EBF2FD; color:#3B82EC; font-weight:600; }
+        .pg-nav-btn .pg-badge { font-size:0.65rem; padding:1px 6px; border-radius:999px; background:#fee2e2; color:#d9534f; font-weight:600; margin-left:auto; flex-shrink:0; }
+        .pg-nav-btn.active .pg-badge { background:#dbeafe; color:#3B82EC; }
+        .pg-sidebar-footer { padding:14px; border-top:1px solid #e4e7ec; }
+        .pg-avatar { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#3B82EC,#1659c7); display:flex; align-items:center; justify-content:center; color:#fff; font-size:0.7rem; font-weight:700; flex-shrink:0; }
+        .pg-dot-badge { position:absolute; top:4px; right:4px; width:7px; height:7px; background:#d9534f; border-radius:50%; border:2px solid #fff; }
+      `}</style>
+
+      <aside className={`pg-sidebar ${collapsed ? 'pg-sidebar-narrow' : 'pg-sidebar-wide'}`}>
+        <div className="pg-logo-area" style={collapsed ? { justifyContent: 'center', padding: '18px 0' } : {}}>
+          <div className="pg-logo-icon">
+            <Shield size={16} color="#fff" />
+          </div>
+          {!collapsed && (
+            <div>
+              <div className="pg-logo-title">CyberRisk IQ</div>
+              <div className="pg-logo-sub">by ReGoRisC · ProGReC</div>
+            </div>
+          )}
         </div>
+
+        <nav className="pg-nav">
+          {navItems.map(item => {
+            const Icon   = item.icon;
+            const active = activePage === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onNavigate(item.id)}
+                className={`pg-nav-btn${active ? ' active' : ''}`}
+                title={collapsed ? item.label : undefined}
+              >
+                <Icon size={16} style={{ flexShrink: 0, color: active ? '#3B82EC' : '#667085' }} />
+                {!collapsed && (
+                  <>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                    {item.badge !== undefined && <span className="pg-badge">{item.badge}</span>}
+                    {active && <ChevronRight size={13} color="#3B82EC" />}
+                  </>
+                )}
+                {collapsed && item.badge !== undefined && <span className="pg-dot-badge" />}
+              </button>
+            );
+          })}
+        </nav>
+
         {!collapsed && (
-          <div>
-            <p className="text-white font-bold text-sm leading-tight">CyberRisk IQ</p>
-            <p className="text-slate-500 text-xs">by ReGoRisC · ProGReC</p>
+          <div className="pg-sidebar-footer">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div className="pg-avatar">AC</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#344054', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Admin Console</div>
+                <div style={{ fontSize: '0.7rem', color: '#667085', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Acme Financial Corp</div>
+              </div>
+            </div>
           </div>
         )}
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 py-4 px-2 space-y-0.5">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = activePage === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group relative ${
-                active
-                  ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'
-              }`}
-            >
-              <Icon size={18} className={`flex-shrink-0 ${active ? 'text-cyan-400' : ''}`} />
-              {!collapsed && (
-                <>
-                  <span className="flex-1 text-left truncate">{item.label}</span>
-                  {item.badge !== undefined && (
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                      active ? 'bg-cyan-500/20 text-cyan-300' : 'bg-red-500/20 text-red-400'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                  {active && <ChevronRight size={14} className="text-cyan-400 flex-shrink-0" />}
-                </>
-              )}
-              {collapsed && item.badge !== undefined && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-              )}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Footer */}
-      {!collapsed && (
-        <div className="px-4 py-4 border-t border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-              AC
-            </div>
-            <div className="min-w-0">
-              <p className="text-slate-300 text-xs font-medium truncate">Admin Console</p>
-              <p className="text-slate-500 text-xs truncate">Acme Financial Corp</p>
-            </div>
-          </div>
-        </div>
-      )}
-    </aside>
+      </aside>
+    </>
   );
 }
