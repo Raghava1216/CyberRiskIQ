@@ -10,7 +10,7 @@ import SeverityBadge from '../components/SeverityBadge';
 import AddIOCModal from '../components/AddIOCModal';
 import type { IOC } from '../lib/types';
 
-const PROXY_URL          = 'http://localhost:3001/threat-feeds';
+const PROXY_URL          = '/api/threat-feeds';
 const LIVE_POLL_INTERVAL = 60_000;
 
 const CATEGORIES = ['All', 'APT', 'Ransomware', 'Malware', 'Phishing', 'Botnet', 'RAT', 'Loader', 'DDoS', 'Insider', 'Supply Chain'];

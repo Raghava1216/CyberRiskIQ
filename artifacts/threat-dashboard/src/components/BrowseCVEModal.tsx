@@ -5,7 +5,7 @@ import {
   ChevronRight, Loader2,
 } from 'lucide-react';
 
-const CVE_LIBRARY_URL = 'http://localhost:3001/cve-library';
+const CVE_LIBRARY_URL = '/api/cve-library';
 
 export interface CVEEntry {
   cve_id:             string;

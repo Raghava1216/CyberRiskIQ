@@ -21,7 +21,7 @@ import {
   HardDrive, Cpu, Globe, Lock, Users,
 } from 'lucide-react';
 
-const PROXY = 'http://localhost:3001';
+const PROXY = '/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
