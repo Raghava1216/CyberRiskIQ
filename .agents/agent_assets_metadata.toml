@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "VhPJTpvbp-XGx4C1RUdFW"
+uri = "file://docs/CyberRiskIQ_Presentation_Guide.md"
+type = "text"
+title = "CyberRiskIQ — Industry Expert Presentation Guide"
