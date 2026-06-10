@@ -32,23 +32,35 @@ function ScoreGauge({ score }: { score: number }) {
   );
 }
 
+const BAR_AREA_H = 96; // px — bar column height
+
 function MiniBar({ month, critical, high, medium, low, maxVal }: {
   month: string; critical: number; high: number; medium: number; low: number; maxVal: number;
 }) {
-  const total = critical + high + medium + low;
-  const scale = maxVal > 0 ? 80 / maxVal : 1;
+  const total   = critical + high + medium + low;
+  // Scale total column height proportionally; each segment carved from that height
+  const colH    = maxVal > 0 ? (total / maxVal) * BAR_AREA_H : 0;
+  const segH    = (v: number) => total > 0 ? Math.max(2, (v / total) * colH) : 0;
+
+  const segs = [
+    { v: low,      c: '#3B82EC99', label: 'low'      },
+    { v: medium,   c: '#f0ad4e99', label: 'medium'   },
+    { v: high,     c: '#fd7e1499', label: 'high'      },
+    { v: critical, c: '#d9534fcc', label: 'critical'  },
+  ];
+
   return (
-    <div className="d-flex flex-column align-items-center gap-1 flex-fill">
-      <div className="d-flex flex-column-reverse gap-px w-100 align-items-center" style={{ height: 84 }}>
-        {([
-          { v: low, c: '#3B82EC99' }, { v: medium, c: '#f0ad4e99' },
-          { v: high, c: '#fd7e1499' }, { v: critical, c: '#d9534fcc' },
-        ] as { v: number; c: string }[]).map(({ v, c }) => v > 0 ? (
-          <div key={c} className="w-100 rounded-1" style={{ height: Math.max(2, v * scale), background: c }} />
-        ) : null)}
+    <div className="d-flex flex-column align-items-center flex-fill" style={{ gap: 5, minWidth: 0 }}>
+      {/* Fixed-height well; bars grow from the bottom */}
+      <div style={{ height: BAR_AREA_H, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column-reverse', gap: 1 }}>
+          {segs.filter(s => s.v > 0).map(s => (
+            <div key={s.label} style={{ height: segH(s.v), background: s.c, borderRadius: 2, width: '100%' }} />
+          ))}
+        </div>
       </div>
-      <span style={{ fontSize: '0.68rem', color: '#667085' }}>{month}</span>
-      <span style={{ fontSize: '0.68rem', color: '#98a2b3', fontVariantNumeric: 'tabular-nums' }}>{total}</span>
+      <span style={{ fontSize: '0.67rem', color: 'var(--pg-text-muted, #667085)', lineHeight: 1 }}>{month}</span>
+      <span style={{ fontSize: '0.65rem', color: 'var(--pg-text-subtle, #98a2b3)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{total}</span>
     </div>
   );
 }
@@ -235,7 +247,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   ))}
                 </div>
               </div>
-              <div className="d-flex align-items-end gap-2" style={{ height: 96 }}>
+              <div className="d-flex gap-2" style={{ height: BAR_AREA_H + 36 }}>
                 {mockRiskTrend.map(m => <MiniBar key={m.month} {...m} maxVal={maxTrend} />)}
               </div>
             </Card.Body>

@@ -15,17 +15,17 @@ import WazuhPage from './pages/WazuhPage';
 import type { NavPage } from './lib/types';
 import type { IOC } from './lib/types';
 import { mockIOCs } from './lib/mockData';
+import { ThemeProvider, useTheme } from './lib/ThemeContext';
 
-export default function App() {
+function AppInner() {
+  const { sidebarDark } = useTheme();
   const [activePage, setActivePage] = useState<NavPage>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // ── Shared IOC state — lifted here so Threats and IOCPage stay in sync ──
   const [iocs, setIocs] = useState<IOC[]>(mockIOCs as IOC[]);
 
   const addIOCs = (newIOCs: IOC[]) => {
     setIocs(prev => {
-      // Deduplicate by id
       const existingIds = new Set(prev.map(i => i.id));
       const unique = newIOCs.filter(i => !existingIds.has(i.id));
       return [...unique, ...prev];
@@ -36,36 +36,46 @@ export default function App() {
 
   const renderPage = () => {
     switch (activePage) {
-      case 'dashboard':      return <Dashboard onNavigate={setActivePage} />;
-      case 'risks':          return <Risks />;
-      case 'threats':        return <Threats iocs={iocs} onAddIOC={addIOC} onAddIOCs={addIOCs} />;
-      case 'vulnerabilities':return <Vulnerabilities />;
-      case 'assets':         return <Assets />;
-      case 'ioc':            return <IOCPage iocs={iocs} onAddIOC={addIOC} onAddIOCs={addIOCs} />;
-      case 'incidents':      return <Incidents />;
-      case 'compliance':     return <Compliance />;
-      case 'reports':        return <Reports />;
-      case 'settings':       return <Settings />;
-      case 'wazuh':          return <WazuhPage />;
+      case 'dashboard':       return <Dashboard onNavigate={setActivePage} />;
+      case 'risks':           return <Risks />;
+      case 'threats':         return <Threats iocs={iocs} onAddIOC={addIOC} onAddIOCs={addIOCs} />;
+      case 'vulnerabilities': return <Vulnerabilities />;
+      case 'assets':          return <Assets />;
+      case 'ioc':             return <IOCPage iocs={iocs} onAddIOC={addIOC} onAddIOCs={addIOCs} />;
+      case 'incidents':       return <Incidents />;
+      case 'compliance':      return <Compliance />;
+      case 'reports':         return <Reports />;
+      case 'settings':        return <Settings />;
+      case 'wazuh':           return <WazuhPage />;
     }
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
-      <Sidebar
-        activePage={activePage}
-        onNavigate={setActivePage}
-        collapsed={sidebarCollapsed}
-      />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <div style={{ display: 'flex', minHeight: '100vh' }}>
+      <div className={sidebarDark ? 'pg-sidebar-dark' : ''}>
+        <Sidebar
+          activePage={activePage}
+          onNavigate={setActivePage}
+          collapsed={sidebarCollapsed}
+        />
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
         <Header
           activePage={activePage}
-          onToggleSidebar={() => setSidebarCollapsed((c) => !c)}
+          onToggleSidebar={() => setSidebarCollapsed(c => !c)}
         />
-        <main className="flex-1 overflow-y-auto">
+        <main style={{ flex: 1, overflowY: 'auto' }}>
           {renderPage()}
         </main>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
   );
 }

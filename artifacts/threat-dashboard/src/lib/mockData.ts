@@ -295,13 +295,13 @@ export const mockTreatmentMix = [
 ];
 
 export const mockRiskTrend = [
-  { month: 'Nov', critical: 18, high: 34, medium: 52, low: 28 },
-  { month: 'Dec', critical: 15, high: 31, medium: 49, low: 30 },
-  { month: 'Jan', critical: 17, high: 33, medium: 51, low: 27 },
-  { month: 'Feb', critical: 14, high: 29, medium: 47, low: 31 },
-  { month: 'Mar', critical: 13, high: 27, medium: 45, low: 32 },
-  { month: 'Apr', critical: 15, high: 30, medium: 46, low: 29 },
-  { month: 'May', critical: 12, high: 28, medium: 44, low: 30 },
+  { month: 'Nov', critical: 22, high: 45, medium: 65, low: 38 },
+  { month: 'Dec', critical: 25, high: 50, medium: 68, low: 35 },
+  { month: 'Jan', critical: 28, high: 54, medium: 72, low: 28 },
+  { month: 'Feb', critical: 21, high: 44, medium: 63, low: 26 },
+  { month: 'Mar', critical: 17, high: 37, medium: 55, low: 24 },
+  { month: 'Apr', critical: 14, high: 31, medium: 49, low: 24 },
+  { month: 'May', critical: 12, high: 28, medium: 44, low: 22 },
 ];
 
 export const mockIOCs = [
