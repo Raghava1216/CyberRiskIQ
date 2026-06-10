@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import {
-  Plus, Search, ChevronDown, Server, Cloud, Cpu, Monitor, Upload,
-  CheckCircle2, AlertTriangle, ShieldCheck, Tag, DollarSign,
-} from 'lucide-react';
+  Container, Row, Col, Card, Badge, Button, Form,
+  InputGroup, Table, ProgressBar,
+} from 'react-bootstrap';
+import {
+  Plus, Search, Server, Cloud, Cpu, Monitor, Upload,
+  CheckCircle, AlertTriangle, Shield, Tag, DollarSign,
+} from 'react-feather';
 import { mockAssets } from '../lib/mockData';
 import type { Asset } from '../lib/types';
 import AddAssetModal, { type NewAsset } from '../components/AddAssetModal';
@@ -20,43 +24,56 @@ const typeIcon = (type: string) => {
   return Server;
 };
 
-const critColor = (c: string) => {
-  if (c === 'Critical') return { text: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20', icon: 'bg-red-500/15 text-red-400' };
-  if (c === 'High')     return { text: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20', icon: 'bg-orange-500/15 text-orange-400' };
-  if (c === 'Medium')   return { text: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20', icon: 'bg-amber-500/15 text-amber-400' };
-  return { text: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20', icon: 'bg-slate-700 text-slate-400' };
-};
+function critVariant(c: string): string {
+  if (c === 'Critical') return 'danger';
+  if (c === 'High')     return 'warning';
+  if (c === 'Medium')   return 'warning';
+  return 'success';
+}
 
-const dataClassColor = (d: string) => {
-  if (d === 'Restricted')    return 'bg-red-500/15 text-red-400 border-red-500/20';
-  if (d === 'Confidential')  return 'bg-orange-500/15 text-orange-400 border-orange-500/20';
-  if (d === 'Internal')      return 'bg-amber-500/15 text-amber-400 border-amber-500/20';
-  return 'bg-slate-700/40 text-slate-400 border-slate-600';
-};
+function critStyle(c: string): React.CSSProperties {
+  if (c === 'High')   return { backgroundColor: '#fd7e14', color: '#fff' };
+  if (c === 'Medium') return { backgroundColor: '#f0ad4e', color: '#212529' };
+  return {};
+}
 
-const assetClassColor = (c: string) => {
-  if (c === 'Primary')    return 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20';
-  if (c === 'Supporting') return 'bg-blue-500/15 text-blue-400 border-blue-500/20';
-  return 'bg-slate-700/40 text-slate-400 border-slate-600';
-};
+function critIconStyle(c: string): React.CSSProperties {
+  if (c === 'Critical') return { background: 'rgba(217,83,79,0.12)',  color: '#d9534f'  };
+  if (c === 'High')     return { background: 'rgba(253,126,20,0.12)', color: '#fd7e14'  };
+  if (c === 'Medium')   return { background: 'rgba(240,173,78,0.12)', color: '#b07d20'  };
+  return { background: '#f4f7f9', color: '#6c757d' };
+}
+
+function dataClassBadge(d: string) {
+  if (d === 'Restricted')   return { bg: 'danger',   label: d };
+  if (d === 'Confidential') return { bg: 'warning',  label: d };
+  if (d === 'Internal')     return { bg: 'secondary', label: d };
+  return { bg: 'light', label: d };
+}
+
+function assetClassStyle(c: string): React.CSSProperties {
+  if (c === 'Primary')    return { background: 'rgba(59,130,236,0.1)', color: '#3B82EC', border: '1px solid rgba(59,130,236,0.3)', fontSize: '0.7rem' };
+  if (c === 'Supporting') return { background: 'rgba(31,155,207,0.1)', color: '#1F9BCF', border: '1px solid rgba(31,155,207,0.3)', fontSize: '0.7rem' };
+  return { background: '#f4f7f9', color: '#6c757d', border: '1px solid #dee2e6', fontSize: '0.7rem' };
+}
+
+function riskVariant(score: number): string {
+  if (score >= 80) return 'danger';
+  if (score >= 60) return 'warning';
+  if (score >= 40) return 'warning';
+  return 'success';
+}
+
+function riskStyle(score: number): React.CSSProperties {
+  if (score >= 60 && score < 80) return { backgroundColor: '#fd7e14' };
+  if (score >= 40 && score < 60) return { backgroundColor: '#f0ad4e' };
+  return {};
+}
 
 const fmt$ = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(0)}M`
   : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K`
   : `$${n}`;
-
-function RiskScoreBar({ score }: { score: number }) {
-  const color = score >= 80 ? 'bg-red-500' : score >= 60 ? 'bg-orange-500' : score >= 40 ? 'bg-amber-500' : 'bg-emerald-500';
-  const textColor = score >= 80 ? 'text-red-400' : score >= 60 ? 'text-orange-400' : score >= 40 ? 'text-amber-400' : 'text-emerald-400';
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${score}%` }} />
-      </div>
-      <span className={`text-xs font-bold tabular-nums w-6 ${textColor}`}>{score}</span>
-    </div>
-  );
-}
 
 function timeAgo(iso: string) {
   if (!iso) return 'Never';
@@ -68,16 +85,16 @@ function timeAgo(iso: string) {
 }
 
 export default function Assets() {
-  const [assets, setAssets]         = useState<Asset[]>(mockAssets as Asset[]);
-  const [search, setSearch]         = useState('');
-  const [category, setCategory]     = useState('All');
+  const [assets, setAssets]           = useState<Asset[]>(mockAssets as Asset[]);
+  const [search, setSearch]           = useState('');
+  const [category, setCategory]       = useState('All');
   const [criticality, setCriticality] = useState('All');
-  const [assetClass, setAssetClass] = useState('All');
-  const [regScope, setRegScope]     = useState('All');
-  const [view, setView]             = useState<'grid' | 'table'>('grid');
-  const [addOpen, setAddOpen]       = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
-  const [toast, setToast]           = useState<string | null>(null);
+  const [assetClass, setAssetClass]   = useState('All');
+  const [regScope, setRegScope]       = useState('All');
+  const [view, setView]               = useState<'grid' | 'table'>('grid');
+  const [addOpen, setAddOpen]         = useState(false);
+  const [importOpen, setImportOpen]   = useState(false);
+  const [toast, setToast]             = useState<string | null>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 5000); };
 
@@ -113,244 +130,301 @@ export default function Assets() {
   const filtered = assets.filter(a => {
     const q = search.toLowerCase();
     const matchSearch = a.name.toLowerCase().includes(q) || a.owner.toLowerCase().includes(q) || a.ip_address.includes(q);
-    const matchCat   = category === 'All' || a.category === category;
-    const matchCrit  = criticality === 'All' || a.criticality === criticality;
-    const matchClass = assetClass === 'All' || (a as Asset).asset_class === assetClass;
-    const matchReg   = regScope === 'All' || ((a as Asset).regulatory_scope ?? []).includes(regScope);
+    const matchCat    = category === 'All'    || a.category === category;
+    const matchCrit   = criticality === 'All' || a.criticality === criticality;
+    const matchClass  = assetClass === 'All'  || (a as Asset).asset_class === assetClass;
+    const matchReg    = regScope === 'All'    || ((a as Asset).regulatory_scope ?? []).includes(regScope);
     return matchSearch && matchCat && matchCrit && matchClass && matchReg;
   });
 
   const stats = {
-    total:     assets.length,
-    critical:  assets.filter(a => a.criticality === 'Critical').length,
-    highRisk:  assets.filter(a => a.risk_score >= 70).length,
-    openCVEs:  assets.reduce((s, a) => s + ((a as Asset).open_cve_count ?? 0), 0),
+    total:      assets.length,
+    critical:   assets.filter(a => a.criticality === 'Critical').length,
+    highRisk:   assets.filter(a => a.risk_score >= 70).length,
+    openCVEs:   assets.reduce((s, a) => s + ((a as Asset).open_cve_count ?? 0), 0),
     totalValue: assets.reduce((s, a) => s + ((a as Asset).annual_value ?? 0), 0),
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-screen-2xl relative">
+    <div className="progrec-page p-3 p-lg-4">
       {addOpen    && <AddAssetModal onClose={() => setAddOpen(false)} onSubmit={handleAddAsset} />}
       {importOpen && <ImportAssetCSVModal onClose={() => setImportOpen(false)} onImport={handleImportAssets} />}
 
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm px-4 py-3 rounded-xl shadow-xl backdrop-blur">
-          <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />{toast}
+        <div className="pg-toast">
+          <CheckCircle size={16} color="#4BBF73" />
+          <span>{toast}</span>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Page header */}
+      <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
         <div>
-          <h2 className="text-slate-100 font-bold text-xl">Asset Inventory</h2>
-          <p className="text-slate-500 text-sm">{assets.length} assets · Regulatory scope · CVE tracking · Business value</p>
+          <h4 className="fw-bold mb-1">Asset Inventory</h4>
+          <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>
+            {assets.length} assets · Regulatory scope · CVE tracking · Business value
+          </p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setImportOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800 text-sm transition-colors">
+        <div className="d-flex gap-2">
+          <Button variant="outline-secondary" size="sm" onClick={() => setImportOpen(true)}
+            className="d-flex align-items-center gap-2">
             <Upload size={15} /> Import CSV
-          </button>
-          <button onClick={() => setAddOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold text-sm transition-colors">
-            <Plus size={16} /> Add Asset
-          </button>
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setAddOpen(true)}
+            className="d-flex align-items-center gap-2">
+            <Plus size={15} /> Add Asset
+          </Button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <Row className="g-3 mb-4">
         {[
-          { l: 'Total Assets',    v: stats.total,           c: 'text-blue-400',    bg: 'bg-blue-500/10 border-blue-500/20',   icon: Server },
-          { l: 'Critical Assets', v: stats.critical,        c: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/20',     icon: AlertTriangle },
-          { l: 'High Risk',       v: stats.highRisk,        c: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/20', icon: ShieldCheck },
-          { l: 'Open CVEs',       v: stats.openCVEs,        c: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/20', icon: Tag },
-          { l: 'Total Asset Value', v: fmt$(stats.totalValue), c: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20', icon: DollarSign },
+          { label: 'Total Assets',      value: stats.total,            cls: 'stat-card-primary', color: '#3B82EC', icon: Server     },
+          { label: 'Critical Assets',   value: stats.critical,         cls: 'stat-card-danger',  color: '#d9534f', icon: AlertTriangle },
+          { label: 'High Risk',         value: stats.highRisk,         cls: 'stat-card-warning', color: '#fd7e14', icon: Shield     },
+          { label: 'Open CVEs',         value: stats.openCVEs,         cls: 'stat-card-warning', color: '#f0ad4e', icon: Tag        },
+          { label: 'Total Asset Value', value: fmt$(stats.totalValue), cls: 'stat-card-success', color: '#4BBF73', icon: DollarSign },
         ].map(s => (
-          <div key={s.l} className={`rounded-xl border p-4 ${s.bg}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <s.icon size={14} className={s.c} />
-              <p className={`text-xl font-bold tabular-nums ${s.c}`}>{s.v}</p>
-            </div>
-            <p className="text-slate-400 text-xs">{s.l}</p>
-          </div>
+          <Col key={s.label} xs={6} md={4} lg="auto" className="flex-lg-fill">
+            <Card className={`shadow-sm border h-100 ${s.cls}`}>
+              <Card.Body className="py-3 px-3">
+                <div className="d-flex align-items-center gap-2 mb-1">
+                  <s.icon size={16} color={s.color} />
+                  <span className="fw-bold" style={{ fontSize: '1.3rem', color: s.color }}>{s.value}</span>
+                </div>
+                <div className="text-muted" style={{ fontSize: '0.78rem' }}>{s.label}</div>
+              </Card.Body>
+            </Card>
+          </Col>
         ))}
-      </div>
+      </Row>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-        <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2 flex-1 min-w-48">
-          <Search size={16} className="text-slate-500" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search assets, IPs, owners..."
-            className="bg-transparent text-slate-300 text-sm outline-none flex-1 placeholder:text-slate-600" />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { val: category, set: setCategory, opts: CATEGORIES, ph: 'Category' },
-            { val: criticality, set: setCriticality, opts: CRITICALITIES, ph: 'Criticality' },
-            { val: assetClass, set: setAssetClass, opts: CLASSES, ph: 'Class' },
-            { val: regScope, set: setRegScope, opts: REG_SCOPE, ph: 'Regulation' },
-          ].map(({ val, set, opts }) => (
-            <div key={opts[0]} className="relative">
-              <select value={val} onChange={e => set(e.target.value)}
-                className="appearance-none bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 pr-8 outline-none focus:border-cyan-500 cursor-pointer">
-                {opts.map(o => <option key={o}>{o}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-2 top-3 text-slate-500 pointer-events-none" />
-            </div>
-          ))}
-          <div className="flex rounded-lg overflow-hidden border border-slate-700">
-            {(['grid', 'table'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)}
-                className={`px-3 py-2 text-sm transition-colors capitalize ${view === v ? 'bg-slate-700 text-slate-100' : 'bg-slate-800 text-slate-400 hover:text-slate-300'}`}>
-                {v}
-              </button>
-            ))}
+      <Row className="g-2 mb-3 align-items-center">
+        <Col xs={12} md={4}>
+          <InputGroup size="sm">
+            <InputGroup.Text className="bg-white border-end-0">
+              <Search size={14} color="#6c757d" />
+            </InputGroup.Text>
+            <Form.Control
+              value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Search assets, IPs, owners…"
+              className="border-start-0 ps-0"
+            />
+          </InputGroup>
+        </Col>
+        <Col xs="auto" key="cat">
+          <Form.Select size="sm" value={category} onChange={e => setCategory(e.target.value)}>
+            {CATEGORIES.map(o => <option key={`cat-${o}`} value={o}>{o}</option>)}
+          </Form.Select>
+        </Col>
+        <Col xs="auto" key="crit">
+          <Form.Select size="sm" value={criticality} onChange={e => setCriticality(e.target.value)}>
+            {CRITICALITIES.map(o => <option key={`crit-${o}`} value={o}>{o}</option>)}
+          </Form.Select>
+        </Col>
+        <Col xs="auto" key="cls">
+          <Form.Select size="sm" value={assetClass} onChange={e => setAssetClass(e.target.value)}>
+            {CLASSES.map(o => <option key={`cls-${o}`} value={o}>{o}</option>)}
+          </Form.Select>
+        </Col>
+        <Col xs="auto" key="reg">
+          <Form.Select size="sm" value={regScope} onChange={e => setRegScope(e.target.value)}>
+            {REG_SCOPE.map(o => <option key={`reg-${o}`} value={o}>{o}</option>)}
+          </Form.Select>
+        </Col>
+        <Col xs="auto" className="ms-auto">
+          <div className="btn-group btn-group-sm">
+            <Button variant={view === 'grid'  ? 'primary'         : 'outline-secondary'} onClick={() => setView('grid')}>Grid</Button>
+            <Button variant={view === 'table' ? 'primary'         : 'outline-secondary'} onClick={() => setView('table')}>Table</Button>
           </div>
-        </div>
-      </div>
+        </Col>
+      </Row>
 
       {/* Grid view */}
       {view === 'grid' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <Row className="g-3">
           {filtered.map(asset => {
-            const a = asset as Asset;
+            const a    = asset as Asset;
             const Icon = typeIcon(asset.type);
-            const cc = critColor(asset.criticality);
+            const dc   = dataClassBadge(a.data_classification ?? '');
             return (
-              <div key={asset.id} className={`bg-slate-800/50 border rounded-xl p-5 hover:border-slate-600 transition-all cursor-pointer ${
-                asset.criticality === 'Critical' ? 'border-red-500/20' : 'border-slate-700/50'
-              }`}>
-                {/* Header */}
-                <div className="flex items-start gap-3 mb-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${cc.icon}`}>
-                    <Icon size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-slate-100 font-semibold text-sm truncate">{asset.name}</h3>
-                    <p className="text-slate-500 text-xs">{asset.type} · {asset.location}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cc.bg} ${cc.text}`}>{asset.criticality}</span>
-                    {a.asset_class && <span className={`text-xs px-1.5 py-px rounded border ${assetClassColor(a.asset_class)}`}>{a.asset_class}</span>}
-                  </div>
-                </div>
+              <Col key={asset.id} md={6} xl={4}>
+                <Card className="asset-card shadow-sm h-100"
+                  style={{ borderColor: asset.criticality === 'Critical' ? 'rgba(217,83,79,0.25)' : undefined }}>
+                  <Card.Body>
+                    {/* Header */}
+                    <div className="d-flex align-items-start gap-3 mb-3">
+                      <div className="d-flex align-items-center justify-content-center rounded flex-shrink-0"
+                        style={{ width: 40, height: 40, ...critIconStyle(asset.criticality) }}>
+                        <Icon size={20} />
+                      </div>
+                      <div className="flex-grow-1 min-w-0">
+                        <h6 className="fw-semibold mb-0 text-truncate">{asset.name}</h6>
+                        <div className="text-muted" style={{ fontSize: '0.75rem' }}>{asset.type} · {asset.location}</div>
+                      </div>
+                      <div className="d-flex flex-column align-items-end gap-1">
+                        <Badge bg={critVariant(asset.criticality)} style={critStyle(asset.criticality)}>
+                          {asset.criticality}
+                        </Badge>
+                        {a.asset_class && (
+                          <span className="badge rounded-pill" style={assetClassStyle(a.asset_class)}>{a.asset_class}</span>
+                        )}
+                      </div>
+                    </div>
 
-                {/* Risk score */}
-                <div className="space-y-1 mb-3">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Risk Score</span>
-                    <span className="text-slate-500">{asset.owner}</span>
-                  </div>
-                  <RiskScoreBar score={asset.risk_score} />
-                </div>
+                    {/* Risk score */}
+                    <div className="mb-3">
+                      <div className="d-flex justify-content-between mb-1" style={{ fontSize: '0.75rem' }}>
+                        <span className="text-muted">Risk Score</span>
+                        <span className="text-muted">{asset.owner}</span>
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <ProgressBar now={asset.risk_score} variant={riskVariant(asset.risk_score)}
+                          style={{ height: 6, flex: 1, borderRadius: 99, ...riskStyle(asset.risk_score) }} />
+                        <span className="fw-bold" style={{
+                          fontSize: '0.78rem', width: 24, textAlign: 'right',
+                          color: asset.risk_score >= 80 ? '#d9534f' : asset.risk_score >= 60 ? '#fd7e14' : asset.risk_score >= 40 ? '#f0ad4e' : '#4BBF73',
+                        }}>{asset.risk_score}</span>
+                      </div>
+                    </div>
 
-                {/* CVE + data classification */}
-                <div className="flex items-center gap-2 mb-3 flex-wrap">
-                  {a.open_cve_count > 0 && (
-                    <span className="text-xs bg-red-500/15 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-medium">
-                      {a.open_cve_count} open CVE{a.open_cve_count !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                  {asset.vulnerability_count > 0 && (
-                    <span className="text-xs bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded border border-orange-500/20">
-                      {asset.vulnerability_count} vulns
-                    </span>
-                  )}
-                  {a.data_classification && (
-                    <span className={`text-xs px-2 py-0.5 rounded border ${dataClassColor(a.data_classification)}`}>{a.data_classification}</span>
-                  )}
-                </div>
+                    {/* CVE + data class */}
+                    <div className="d-flex flex-wrap gap-1 mb-2">
+                      {a.open_cve_count > 0 && (
+                        <Badge bg="danger" className="fw-semibold">{a.open_cve_count} CVE{a.open_cve_count !== 1 ? 's' : ''}</Badge>
+                      )}
+                      {asset.vulnerability_count > 0 && (
+                        <Badge bg="warning" className="fw-normal" style={{ color: '#212529' }}>{asset.vulnerability_count} vulns</Badge>
+                      )}
+                      {a.data_classification && (
+                        <Badge bg={dc.bg as any} className="fw-normal"
+                          style={dc.bg === 'light' ? { color: '#6c757d', border: '1px solid #dee2e6' } : {}}>
+                          {dc.label}
+                        </Badge>
+                      )}
+                    </div>
 
-                {/* Regulatory scope */}
-                {(a.regulatory_scope ?? []).length > 0 && (
-                  <div className="flex gap-1 flex-wrap mb-3">
-                    {(a.regulatory_scope ?? []).map(r => (
-                      <span key={r} className="text-xs px-1.5 py-px bg-slate-700/60 text-slate-400 rounded border border-slate-600/40">{r}</span>
-                    ))}
-                  </div>
-                )}
+                    {/* Regulatory scope */}
+                    {(a.regulatory_scope ?? []).length > 0 && (
+                      <div className="d-flex flex-wrap gap-1 mb-2">
+                        {(a.regulatory_scope ?? []).map(r => (
+                          <span key={r} className="badge rounded-pill"
+                            style={{ background: '#f4f7f9', color: '#6c757d', border: '1px solid #dee2e6', fontSize: '0.68rem', fontWeight: 400 }}>{r}</span>
+                        ))}
+                      </div>
+                    )}
 
-                {/* Footer */}
-                <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-700/40">
-                  <span className="text-slate-500 font-mono">{asset.ip_address}</span>
-                  <div className="flex items-center gap-2">
-                    {a.annual_value > 0 && <span className="text-emerald-400 font-medium">{fmt$(a.annual_value)}</span>}
-                    <span className="text-slate-600">Scanned {timeAgo(asset.last_scanned_at)}</span>
-                  </div>
-                </div>
-              </div>
+                    {/* Footer */}
+                    <div className="d-flex justify-content-between align-items-center pt-2 border-top mt-2"
+                      style={{ fontSize: '0.75rem' }}>
+                      <span className="text-muted font-monospace">{asset.ip_address}</span>
+                      <div className="d-flex align-items-center gap-2">
+                        {a.annual_value > 0 && (
+                          <span className="fw-medium" style={{ color: '#4BBF73' }}>{fmt$(a.annual_value)}</span>
+                        )}
+                        <span className="text-muted">Scanned {timeAgo(asset.last_scanned_at)}</span>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
             );
           })}
           {filtered.length === 0 && (
-            <div className="col-span-full py-16 text-center text-slate-500 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              No assets match current filters.
-            </div>
+            <Col xs={12}>
+              <Card className="shadow-sm">
+                <Card.Body className="py-5 text-center text-muted">No assets match current filters.</Card.Body>
+              </Card>
+            </Col>
           )}
-        </div>
+        </Row>
       )}
 
       {/* Table view */}
       {view === 'table' && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-700/50">
-                  {['Asset', 'Type / Class', 'Criticality', 'Risk', 'Open CVEs', 'Data Class', 'Regulatory Scope', 'Annual Value', 'Last Scanned'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+        <Card className="shadow-sm">
+          <div className="table-responsive">
+            <Table hover className="mb-0 align-middle" style={{ fontSize: '0.83rem' }}>
+              <thead className="table-light">
+                <tr>
+                  {['Asset', 'Type / Class', 'Criticality', 'Risk Score', 'Open CVEs', 'Data Class', 'Regulatory Scope', 'Annual Value', 'Last Scanned'].map(h => (
+                    <th key={h} className="text-uppercase fw-semibold text-muted px-3 py-2 border-bottom"
+                      style={{ fontSize: '0.7rem', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/30">
+              <tbody>
                 {filtered.map(asset => {
-                  const a = asset as Asset;
-                  const cc = critColor(asset.criticality);
+                  const a  = asset as Asset;
+                  const dc = dataClassBadge(a.data_classification ?? '');
                   return (
-                    <tr key={asset.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="px-4 py-3">
-                        <p className="text-slate-200 font-medium text-sm">{asset.name}</p>
-                        <p className="text-slate-500 text-xs">{asset.owner} · {asset.location}</p>
+                    <tr key={asset.id} className="border-bottom">
+                      <td className="px-3 py-2">
+                        <div className="fw-medium">{asset.name}</div>
+                        <div className="text-muted" style={{ fontSize: '0.75rem' }}>{asset.owner} · {asset.location}</div>
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="text-slate-400 text-xs">{asset.type}</p>
-                        {a.asset_class && <span className={`text-xs px-1.5 py-px rounded border ${assetClassColor(a.asset_class)}`}>{a.asset_class}</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cc.bg} ${cc.text}`}>{asset.criticality}</span>
-                      </td>
-                      <td className="px-4 py-3 w-28">
-                        <RiskScoreBar score={asset.risk_score} />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={a.open_cve_count > 0 ? 'text-red-400 font-semibold' : 'text-slate-600'}>{a.open_cve_count ?? 0}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {a.data_classification && (
-                          <span className={`text-xs px-2 py-0.5 rounded border ${dataClassColor(a.data_classification)}`}>{a.data_classification}</span>
+                      <td className="px-3 py-2">
+                        <div className="text-muted">{asset.type}</div>
+                        {a.asset_class && (
+                          <span className="badge rounded-pill" style={assetClassStyle(a.asset_class)}>{a.asset_class}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1 flex-wrap">
+                      <td className="px-3 py-2">
+                        <Badge bg={critVariant(asset.criticality)} style={critStyle(asset.criticality)}>
+                          {asset.criticality}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2" style={{ minWidth: 100 }}>
+                        <div className="d-flex align-items-center gap-2">
+                          <ProgressBar now={asset.risk_score} variant={riskVariant(asset.risk_score)}
+                            style={{ height: 6, flex: 1, borderRadius: 99, ...riskStyle(asset.risk_score) }} />
+                          <span className="fw-bold" style={{
+                            fontSize: '0.75rem', width: 22,
+                            color: asset.risk_score >= 80 ? '#d9534f' : asset.risk_score >= 60 ? '#fd7e14' : asset.risk_score >= 40 ? '#f0ad4e' : '#4BBF73',
+                          }}>{asset.risk_score}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={a.open_cve_count > 0 ? 'fw-semibold text-danger' : 'text-muted'}>
+                          {a.open_cve_count ?? 0}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {a.data_classification && (
+                          <Badge bg={dc.bg as any} className="fw-normal"
+                            style={dc.bg === 'light' ? { color: '#6c757d', border: '1px solid #dee2e6' } : {}}>
+                            {dc.label}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="d-flex flex-wrap gap-1">
                           {(a.regulatory_scope ?? []).map(r => (
-                            <span key={r} className="text-xs px-1.5 py-px bg-slate-700/50 text-slate-400 rounded border border-slate-600/30">{r}</span>
+                            <span key={r} className="badge rounded-pill"
+                              style={{ background: '#f4f7f9', color: '#6c757d', border: '1px solid #dee2e6', fontSize: '0.68rem', fontWeight: 400 }}>{r}</span>
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-emerald-400 text-xs font-medium tabular-nums">{a.annual_value ? fmt$(a.annual_value) : '—'}</span>
+                      <td className="px-3 py-2">
+                        <span className="fw-medium" style={{ color: a.annual_value ? '#4BBF73' : '#adb5bd' }}>
+                          {a.annual_value ? fmt$(a.annual_value) : '—'}
+                        </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-slate-500 text-xs whitespace-nowrap">{timeAgo(asset.last_scanned_at)}</span>
+                      <td className="px-3 py-2 text-muted" style={{ whiteSpace: 'nowrap' }}>
+                        {timeAgo(asset.last_scanned_at)}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
-            </table>
+            </Table>
           </div>
-          {filtered.length === 0 && <div className="py-12 text-center text-slate-500">No assets match current filters.</div>}
-        </div>
+          {filtered.length === 0 && (
+            <div className="py-5 text-center text-muted">No assets match current filters.</div>
+          )}
+        </Card>
       )}
     </div>
   );

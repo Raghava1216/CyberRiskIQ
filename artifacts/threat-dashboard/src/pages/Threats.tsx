@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus, Search, ChevronDown, ExternalLink, Radio, RefreshCw,
+  Container, Row, Col, Card, Badge, Button, Nav, Form,
+  InputGroup, Offcanvas, ProgressBar, Spinner,
+} from 'react-bootstrap';
+import {
+  Plus, Search, ExternalLink, Radio, RefreshCw,
   AlertTriangle, Wifi, WifiOff, X, Pause, Play, Activity,
-  CheckCircle2, Clock, Shield, PlusCircle, ChevronRight,
-} from 'lucide-react';
+  CheckCircle, Clock, Shield, PlusCircle, ChevronRight,
+} from 'react-feather';
 import { mockThreats, mockThreatActors } from '../lib/mockData';
 import { iocStore } from '../lib/iocStore';
-import SeverityBadge from '../components/SeverityBadge';
 import AddIOCModal from '../components/AddIOCModal';
 import type { IOC } from '../lib/types';
 
@@ -38,20 +41,23 @@ interface LiveThreat {
   targets?:         string[];
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function severityColor(s: string) {
-  if (s === 'Critical') return 'text-red-400';
-  if (s === 'High')     return 'text-orange-400';
-  if (s === 'Medium')   return 'text-amber-400';
-  return 'text-emerald-400';
+function severityVariant(s: string): string {
+  if (s === 'Critical') return 'danger';
+  if (s === 'High')     return 'warning';
+  if (s === 'Medium')   return 'warning';
+  return 'success';
 }
 
-function severityDot(s: string) {
-  if (s === 'Critical') return 'bg-red-500';
-  if (s === 'High')     return 'bg-orange-500';
-  if (s === 'Medium')   return 'bg-amber-500';
-  return 'bg-emerald-500';
+function severityStyle(s: string): React.CSSProperties {
+  if (s === 'High')   return { backgroundColor: '#fd7e14', color: '#fff' };
+  if (s === 'Medium') return { backgroundColor: '#f0ad4e', color: '#212529' };
+  return {};
+}
+
+function confidenceVariant(v: number): string {
+  if (v >= 80) return 'success';
+  if (v >= 60) return 'warning';
+  return 'danger';
 }
 
 function timeAgo(iso: string) {
@@ -62,14 +68,21 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function sourceChip(source: string) {
-  if (source.includes('IPsum'))        return { label: 'IPsum',   color: 'bg-red-500/10 text-red-400 border-red-500/20'          };
-  if (source.includes('Ransomware'))   return { label: 'MISP RW', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20'  };
-  if (source.includes('Threat Actor')) return { label: 'MISP TA', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20'        };
-  return                                      { label: 'Feed',    color: 'bg-slate-500/10 text-slate-400 border-slate-500/20'     };
+function sourceChip(source: string): { label: string; cls: string } {
+  if (source.includes('IPsum'))        return { label: 'IPsum',   cls: 'source-chip-ipsum'   };
+  if (source.includes('Ransomware'))   return { label: 'MISP RW', cls: 'source-chip-misp-rw' };
+  if (source.includes('Threat Actor')) return { label: 'MISP TA', cls: 'source-chip-misp-ta' };
+  return                                      { label: 'Feed',    cls: 'source-chip-feed'    };
 }
 
-// Convert LiveThreat → IOC for the shared register
+function iocBadgeCls(type: string): string {
+  if (type === 'IP')     return 'ioc-badge ioc-badge-ip';
+  if (type === 'Domain') return 'ioc-badge ioc-badge-domain';
+  if (type === 'Hash')   return 'ioc-badge ioc-badge-hash';
+  if (type === 'URL')    return 'ioc-badge ioc-badge-url';
+  return 'ioc-badge ioc-badge-other';
+}
+
 function threatToIOC(threat: LiveThreat): IOC {
   const typeMap: Record<string, IOC['type']> = {
     IP: 'IP', Domain: 'Domain', URL: 'URL', Hash: 'Hash', Email: 'Email',
@@ -93,38 +106,6 @@ function threatToIOC(threat: LiveThreat): IOC {
   };
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function IOCBadge({ type, value }: { type: string; value: string }) {
-  const colors: Record<string, string> = {
-    IP:     'bg-red-500/10 text-red-400 border-red-500/20',
-    Domain: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-    Hash:   'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    URL:    'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    IOC:    'bg-slate-500/10 text-slate-400 border-slate-500/20',
-  };
-  return (
-    <span className={`inline-flex items-center gap-1 text-xs font-mono px-2 py-0.5 rounded border ${colors[type] ?? colors.IOC}`}>
-      <span className="font-sans text-xs opacity-60">{type}:</span>
-      <span className="truncate max-w-[220px]">{value}</span>
-    </span>
-  );
-}
-
-function ConfidenceBar({ value }: { value: number }) {
-  const color = value >= 80 ? 'bg-emerald-500' : value >= 60 ? 'bg-amber-500' : 'bg-orange-500';
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} />
-      </div>
-      <span className="text-xs text-slate-400 w-8">{value}%</span>
-    </div>
-  );
-}
-
-// ── Threat card ───────────────────────────────────────────────────────────────
-
 interface ThreatCardProps {
   threat:     LiveThreat;
   isLive:     boolean;
@@ -135,120 +116,116 @@ interface ThreatCardProps {
 function ThreatCard({ threat, isLive, onAddToIOC, added }: ThreatCardProps) {
   const [expanded, setExpanded] = useState(false);
   const src = sourceChip(threat.source);
+  const sev = severityVariant(threat.severity);
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden hover:border-slate-600 transition-colors">
-      <div className="p-4">
-        <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <SeverityBadge level={threat.severity} size="md" />
-              <SeverityBadge level={threat.status} />
-              <span className="text-xs bg-slate-700/50 text-slate-400 px-2 py-0.5 rounded">{threat.category}</span>
-              <span className={`text-xs px-1.5 py-px rounded border ${src.color}`}>{src.label}</span>
+    <Card className="threat-card shadow-sm mb-3">
+      <Card.Body className="p-3">
+        <div className="d-flex gap-3">
+          <div className="flex-grow-1 min-width-0">
+            <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+              <Badge bg={sev} style={severityStyle(threat.severity)}>{threat.severity}</Badge>
+              <Badge bg="secondary" className="fw-normal">{threat.status}</Badge>
+              <span className="badge rounded-pill" style={{ background: '#f4f7f9', color: '#495057', fontSize: '0.7rem', border: '1px solid #dee2e6' }}>{threat.category}</span>
+              <span className={`source-chip ${src.cls}`}>{src.label}</span>
               {isLive && (
-                <span className="inline-flex items-center gap-1 text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
+                <span className="d-inline-flex align-items-center gap-1 badge"
+                  style={{ background: 'rgba(75,191,115,0.1)', color: '#4BBF73', border: '1px solid rgba(75,191,115,0.3)', fontSize: '0.7rem' }}>
+                  <span className="live-dot" style={{ width: 6, height: 6 }} /> Live
                 </span>
               )}
             </div>
 
-            <h3 className="text-slate-100 font-semibold">{threat.title}</h3>
+            <h6 className="fw-semibold mb-2">{threat.title}</h6>
 
-            {/* Primary IOC + associated toggle */}
-            <div className="flex flex-wrap gap-2 items-center">
-              <IOCBadge type={threat.ioc_type} value={threat.ioc_value} />
+            <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+              <span className={iocBadgeCls(threat.ioc_type)}>
+                <span style={{ opacity: 0.6, fontSize: '0.65rem' }}>{threat.ioc_type}:</span>
+                <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{threat.ioc_value}</span>
+              </span>
               {threat.associated_iocs && threat.associated_iocs.length > 0 && (
-                <button
-                  onClick={() => setExpanded(e => !e)}
-                  className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 transition-colors"
-                >
-                  <ChevronRight size={12} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                <button className="btn btn-link btn-sm p-0 text-muted" style={{ fontSize: '0.75rem' }}
+                  onClick={() => setExpanded(e => !e)}>
+                  <ChevronRight size={12} style={{ transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
                   +{threat.associated_iocs.length} associated
                 </button>
               )}
             </div>
 
-            {/* Expanded associated IOCs */}
             {expanded && threat.associated_iocs && threat.associated_iocs.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pl-2 border-l-2 border-slate-700">
+              <div className="d-flex flex-wrap gap-1 mb-2 ps-2 border-start border-2">
                 {threat.associated_iocs.map((ioc, i) => (
-                  <span key={i} className="text-xs font-mono bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded">
-                    {ioc}
-                  </span>
+                  <span key={i} className="ioc-badge ioc-badge-other">{ioc}</span>
                 ))}
               </div>
             )}
 
-            {/* Synonyms for threat actors */}
             {threat.synonyms && threat.synonyms.length > 0 && (
-              <div className="flex flex-wrap gap-1 items-center">
-                <span className="text-xs text-slate-600">Also known as:</span>
+              <div className="d-flex flex-wrap align-items-center gap-1 mb-2">
+                <span className="text-muted" style={{ fontSize: '0.72rem' }}>Also known as:</span>
                 {threat.synonyms.slice(0, 4).map((s, i) => (
-                  <span key={i} className="text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-px rounded">{s}</span>
+                  <span key={i} className="badge rounded-pill"
+                    style={{ background: 'rgba(59,130,236,0.1)', color: '#3B82EC', border: '1px solid rgba(59,130,236,0.25)', fontSize: '0.7rem' }}>{s}</span>
                 ))}
               </div>
             )}
 
             {threat.description && (
-              <p className="text-slate-500 text-xs leading-relaxed line-clamp-2">{threat.description}</p>
+              <p className="text-muted mb-2" style={{ fontSize: '0.78rem', lineHeight: 1.5,
+                overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                {threat.description}
+              </p>
             )}
 
-            <div className="flex flex-wrap gap-4 text-xs text-slate-500">
-              <span>Source: <span className="text-slate-400">{threat.source}</span></span>
-              <span>Seen: <span className="text-slate-400">{timeAgo(threat.first_seen)}</span></span>
+            <div className="d-flex flex-wrap gap-3 mb-2" style={{ fontSize: '0.75rem', color: '#6c757d' }}>
+              <span>Source: <span className="text-dark">{threat.source}</span></span>
+              <span>Seen: <span className="text-dark">{timeAgo(threat.first_seen)}</span></span>
               {threat.country && threat.country !== 'Unknown' && (
-                <span>Origin: <span className="text-slate-400">{threat.country}</span></span>
+                <span>Origin: <span className="text-dark">{threat.country}</span></span>
               )}
               {threat.reporter && (
-                <span>Via: <span className="text-slate-400">{threat.reporter}</span></span>
+                <span>Via: <span className="text-dark">{threat.reporter}</span></span>
               )}
             </div>
 
-            <div className="flex gap-1 flex-wrap">
+            <div className="d-flex flex-wrap gap-1">
               {(threat.tags ?? []).slice(0, 5).map(t => (
-                <span key={t} className="text-xs bg-slate-700/50 text-slate-500 px-1.5 py-0.5 rounded">{t}</span>
+                <span key={t} className="badge rounded-pill"
+                  style={{ background: '#f4f7f9', color: '#6c757d', border: '1px solid #dee2e6', fontSize: '0.68rem', fontWeight: 400 }}>{t}</span>
               ))}
             </div>
           </div>
 
-          {/* Right: confidence + add button */}
-          <div className="flex flex-row sm:flex-col items-center sm:items-end gap-3 sm:gap-2 flex-shrink-0">
-            <div className="flex flex-col items-end gap-1">
-              <span className="text-xs text-slate-500">Confidence</span>
-              <ConfidenceBar value={threat.confidence} />
+          <div className="d-flex flex-column align-items-end gap-2 flex-shrink-0" style={{ minWidth: 120 }}>
+            <div className="text-end w-100">
+              <div className="text-muted mb-1" style={{ fontSize: '0.7rem' }}>Confidence</div>
+              <div className="d-flex align-items-center gap-2">
+                <ProgressBar now={threat.confidence} variant={confidenceVariant(threat.confidence)}
+                  style={{ height: 6, width: 64, borderRadius: 99 }} />
+                <span className="text-muted" style={{ fontSize: '0.72rem', width: 28 }}>{threat.confidence}%</span>
+              </div>
             </div>
 
-            <button
-              onClick={() => onAddToIOC(threat)}
-              disabled={added}
-              title={added ? 'Already in IOC Register' : 'Add to IOC Register'}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                added
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 cursor-default'
-                  : 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 cursor-pointer'
-              }`}
-            >
+            <Button size="sm" variant={added ? 'outline-success' : 'outline-primary'}
+              disabled={added} onClick={() => onAddToIOC(threat)}
+              className="d-flex align-items-center gap-1" style={{ fontSize: '0.72rem' }}>
               {added
-                ? <><CheckCircle2 size={12} /> In Register</>
-                : <><PlusCircle size={12} /> Add to Register</>
-              }
-            </button>
+                ? <><CheckCircle size={11} /> In Register</>
+                : <><PlusCircle size={11} /> Add to Register</>}
+            </Button>
 
-            <button className="text-slate-600 hover:text-cyan-400 text-xs flex items-center gap-1 transition-colors">
-              Details <ExternalLink size={11} />
+            <button className="btn btn-link btn-sm p-0 text-muted d-flex align-items-center gap-1" style={{ fontSize: '0.72rem' }}>
+              Details <ExternalLink size={10} />
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 }
 
-// ── Live Feed Drawer ──────────────────────────────────────────────────────────
-
 interface LiveFeedDrawerProps {
+  show:          boolean;
   onClose:       () => void;
   threats:       LiveThreat[];
   loading:       boolean;
@@ -265,7 +242,7 @@ interface LiveFeedDrawerProps {
 }
 
 function LiveFeedDrawer({
-  onClose, threats, loading, fetchError, onRefresh,
+  show, onClose, threats, loading, fetchError, onRefresh,
   lastFetched, countdown, paused, onTogglePause,
   newCount, onClearNew, addedIds, onAddToIOC,
 }: LiveFeedDrawerProps) {
@@ -279,183 +256,155 @@ function LiveFeedDrawer({
   const taCount    = threats.filter(t => t.source.includes('Threat Actor')).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="w-full max-w-xl bg-slate-900 border-l border-slate-700 flex flex-col shadow-2xl">
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="relative w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-              <Activity size={16} className="text-emerald-400" />
-              {!paused && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-900 animate-pulse" />}
-            </div>
-            <div>
-              <h2 className="text-slate-100 font-semibold text-sm">Live Threat Feed</h2>
-              <p className="text-slate-500 text-xs">IPsum · MISP Ransomware · MISP Threat Actors</p>
-            </div>
+    <Offcanvas show={show} onHide={onClose} placement="end" className="pg-offcanvas">
+      <Offcanvas.Header className="border-bottom py-3">
+        <div className="d-flex align-items-center gap-2 flex-grow-1">
+          <div className="d-flex align-items-center justify-content-center rounded position-relative"
+            style={{ width: 36, height: 36, background: 'rgba(75,191,115,0.1)' }}>
+            <Activity size={16} color="#4BBF73" />
+            {!paused && <span className="live-dot position-absolute" style={{ top: 2, right: 2, width: 8, height: 8 }} />}
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={onTogglePause}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                paused ? 'border-amber-500/30 bg-amber-500/10 text-amber-400' : 'border-slate-700 text-slate-400 hover:bg-slate-800'
-              }`}>
-              {paused ? <><Play size={12} /> Resume</> : <><Pause size={12} /> Pause</>}
-            </button>
-            <button onClick={onClose} className="text-slate-500 hover:text-slate-300 p-1 rounded-lg hover:bg-slate-800">
-              <X size={18} />
-            </button>
+          <div>
+            <div className="fw-semibold" style={{ fontSize: '0.875rem' }}>Live Threat Feed</div>
+            <div className="text-muted" style={{ fontSize: '0.72rem' }}>IPsum · MISP Ransomware · MISP Threat Actors</div>
           </div>
         </div>
-
-        {/* Status bar */}
-        <div className="flex items-center justify-between px-5 py-2.5 bg-slate-800/50 border-b border-slate-800 text-xs">
-          <div className="flex items-center gap-3">
-            {loading
-              ? <span className="flex items-center gap-1.5 text-slate-400"><RefreshCw size={12} className="animate-spin" /> Fetching…</span>
-              : fetchError
-              ? <span className="flex items-center gap-1.5 text-red-400"><WifiOff size={12} /> Proxy offline</span>
-              : <span className="flex items-center gap-1.5 text-emerald-400"><Wifi size={12} /> Live · {threats.length} indicators</span>
-            }
-          </div>
-          <div className="flex items-center gap-2">
-            {newCount > 0 && (
-              <button onClick={onClearNew} className="flex items-center gap-1 bg-cyan-500/15 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-500/20">
-                +{newCount} new
-              </button>
-            )}
-            {lastFetched && <span className="text-slate-600 flex items-center gap-1"><Clock size={10} /> {timeAgo(lastFetched.toISOString())}</span>}
-            {!paused && <span className="text-slate-600">Next in <span className="text-slate-400 font-mono">{countdown}s</span></span>}
-            {paused && <span className="text-amber-500">Paused</span>}
-          </div>
+        <div className="d-flex align-items-center gap-2">
+          <Button size="sm" variant={paused ? 'warning' : 'outline-secondary'}
+            onClick={onTogglePause} className="d-flex align-items-center gap-1" style={{ fontSize: '0.75rem' }}>
+            {paused ? <><Play size={11} /> Resume</> : <><Pause size={11} /> Pause</>}
+          </Button>
+          <button className="btn-close" onClick={onClose} />
         </div>
+      </Offcanvas.Header>
 
-        {/* Source breakdown */}
-        {threats.length > 0 && (
-          <div className="flex gap-2 px-5 py-2 border-b border-slate-800 text-xs flex-wrap">
-            <span className="flex items-center gap-1 bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded">
-              <Shield size={10} /> IPsum: {ipsumCount}
+      <div className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
+        style={{ background: '#f8f9fa', fontSize: '0.78rem' }}>
+        <div>
+          {loading
+            ? <span className="d-flex align-items-center gap-1 text-muted"><Spinner animation="border" size="sm" style={{ width: 12, height: 12 }} /> Fetching…</span>
+            : fetchError
+            ? <span className="d-flex align-items-center gap-1 text-danger"><WifiOff size={12} /> Proxy offline</span>
+            : <span className="d-flex align-items-center gap-1 text-success"><Wifi size={12} /> Live · {threats.length} indicators</span>
+          }
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          {newCount > 0 && (
+            <button className="badge rounded-pill border-0"
+              style={{ background: 'rgba(59,130,236,0.1)', color: '#3B82EC', cursor: 'pointer' }}
+              onClick={onClearNew}>+{newCount} new</button>
+          )}
+          {lastFetched && (
+            <span className="text-muted d-flex align-items-center gap-1">
+              <Clock size={10} /> {timeAgo(lastFetched.toISOString())}
             </span>
-            <span className="flex items-center gap-1 bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded">
-              MISP RW: {rwCount}
-            </span>
-            <span className="flex items-center gap-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded">
-              MISP TA: {taCount}
-            </span>
-            <span className="ml-auto text-slate-600 text-xs">Click Add to push to IOC Register</span>
+          )}
+          {!paused && <span className="text-muted">Next in <span className="fw-medium">{countdown}s</span></span>}
+          {paused && <span className="text-warning fw-medium">Paused</span>}
+        </div>
+      </div>
+
+      {threats.length > 0 && (
+        <div className="d-flex gap-2 px-3 py-2 border-bottom flex-wrap" style={{ fontSize: '0.72rem' }}>
+          <span className="source-chip source-chip-ipsum d-flex align-items-center gap-1"><Shield size={10} /> IPsum: {ipsumCount}</span>
+          <span className="source-chip source-chip-misp-rw">MISP RW: {rwCount}</span>
+          <span className="source-chip source-chip-misp-ta">MISP TA: {taCount}</span>
+          <span className="ms-auto text-muted">Click Add to push to IOC Register</span>
+        </div>
+      )}
+
+      <div className="d-flex align-items-center gap-3 px-3 py-2 border-bottom" style={{ fontSize: '0.72rem' }}>
+        {(['Critical','High','Medium','Low'] as const).map(s => (
+          <span key={s} className="d-flex align-items-center gap-1">
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+              background: s === 'Critical' ? '#d9534f' : s === 'High' ? '#fd7e14' : s === 'Medium' ? '#f0ad4e' : '#4BBF73'
+            }} />
+            <span className="text-muted">{s}</span>
+          </span>
+        ))}
+      </div>
+
+      <Offcanvas.Body ref={logRef} className="p-0 overflow-auto">
+        {loading && threats.length === 0 && (
+          <div>
+            {[1,2,3,4,5].map(n => (
+              <div key={n} className="d-flex align-items-center gap-3 px-3 py-3 border-bottom placeholder-glow">
+                <span className="placeholder rounded-circle" style={{ width: 10, height: 10 }} />
+                <div className="flex-grow-1">
+                  <div className="placeholder col-8 mb-1" style={{ height: 12, borderRadius: 4 }} />
+                  <div className="placeholder col-5" style={{ height: 10, borderRadius: 4 }} />
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Severity legend */}
-        <div className="flex items-center gap-4 px-5 py-2 border-b border-slate-800 text-xs">
-          {['Critical','High','Medium','Low'].map(s => (
-            <span key={s} className={`flex items-center gap-1.5 ${severityColor(s)}`}>
-              <span className={`w-2 h-2 rounded-full ${severityDot(s)}`} />{s}
-            </span>
-          ))}
-        </div>
+        {!loading && threats.length === 0 && fetchError && (
+          <div className="d-flex flex-column align-items-center justify-content-center text-center px-4 py-5">
+            <AlertTriangle size={28} color="#f0ad4e" className="mb-3" />
+            <p className="fw-medium mb-1">Proxy server not running</p>
+            <p className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Start it in a separate terminal:</p>
+            <code className="d-block px-3 py-2 rounded mb-3" style={{ background: '#f4f7f9', color: '#3B82EC', fontSize: '0.78rem' }}>node threat-proxy.cjs</code>
+            <Button variant="outline-primary" size="sm" onClick={onRefresh} className="d-flex align-items-center gap-1">
+              <RefreshCw size={12} /> Retry
+            </Button>
+          </div>
+        )}
 
-        {/* Stream */}
-        <div ref={logRef} className="flex-1 overflow-y-auto">
-
-          {loading && threats.length === 0 && (
-            <div className="space-y-px">
-              {[1,2,3,4,5,6].map(n => (
-                <div key={n} className="flex items-center gap-3 px-5 py-3 animate-pulse">
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-700 flex-shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 bg-slate-800 rounded w-3/4" />
-                    <div className="h-2.5 bg-slate-800 rounded w-1/2" />
-                  </div>
+        {threats.map((threat, idx) => {
+          const src     = sourceChip(threat.source);
+          const isAdded = addedIds.has(threat.id);
+          const dotColor = threat.severity === 'Critical' ? '#d9534f' : threat.severity === 'High' ? '#fd7e14'
+            : threat.severity === 'Medium' ? '#f0ad4e' : '#4BBF73';
+          return (
+            <div key={threat.id}
+              className={`d-flex align-items-start gap-3 px-3 py-3 border-bottom${idx === 0 && newCount > 0 ? ' bg-primary bg-opacity-10' : ''}`}
+              style={{ transition: 'background 0.15s' }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: dotColor, flexShrink: 0, marginTop: 4,
+                animation: threat.status === 'Active' ? 'pg-pulse 1.5s infinite' : 'none' }} />
+              <div className="flex-grow-1 min-w-0">
+                <div className="d-flex align-items-center flex-wrap gap-2 mb-1">
+                  <span className="fw-bold" style={{ fontSize: '0.78rem', color: dotColor }}>{threat.severity}</span>
+                  <span className="text-muted" style={{ fontSize: '0.72rem' }}>·</span>
+                  <span className="text-muted" style={{ fontSize: '0.72rem' }}>{threat.category}</span>
+                  <span className={`source-chip ${src.cls}`}>{src.label}</span>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {!loading && threats.length === 0 && fetchError && (
-            <div className="flex flex-col items-center justify-center h-56 gap-4 text-center px-6">
-              <AlertTriangle size={28} className="text-amber-400" />
-              <div>
-                <p className="text-amber-300 text-sm font-medium mb-1">Proxy server not running</p>
-                <p className="text-slate-500 text-xs mb-2">Start it in a separate terminal:</p>
-                <code className="block bg-slate-800 text-cyan-400 text-xs px-3 py-2 rounded-lg">node threat-proxy.cjs</code>
-              </div>
-              <button onClick={onRefresh}
-                className="flex items-center gap-1.5 text-xs text-cyan-400 px-3 py-1.5 rounded-lg border border-cyan-500/20 hover:bg-cyan-500/10">
-                <RefreshCw size={12} /> Retry
-              </button>
-            </div>
-          )}
-
-          {threats.map((threat, idx) => {
-            const src     = sourceChip(threat.source);
-            const isAdded = addedIds.has(threat.id);
-            return (
-              <div key={threat.id}
-                className={`flex items-start gap-3 px-5 py-3 border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors group ${
-                  idx === 0 && newCount > 0 ? 'bg-cyan-500/5' : ''
-                }`}
-              >
-                <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 ${severityDot(threat.severity)} ${
-                  threat.status === 'Active' ? 'animate-pulse' : ''
-                }`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                    <span className={`text-xs font-bold ${severityColor(threat.severity)}`}>{threat.severity}</span>
-                    <span className="text-slate-600 text-xs">·</span>
-                    <span className="text-xs text-slate-500">{threat.category}</span>
-                    <span className={`text-xs px-1.5 py-px rounded border ${src.color}`}>{src.label}</span>
-                  </div>
-                  <p className="text-slate-200 text-sm leading-snug truncate">{threat.title}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`font-mono text-xs px-1.5 py-px rounded border truncate max-w-[200px] ${
-                      threat.ioc_type === 'IP'   ? 'bg-red-500/10 text-red-400 border-red-500/20'    :
-                      threat.ioc_type === 'Hash' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                      'bg-orange-500/10 text-orange-400 border-orange-500/20'
-                    }`}>
-                      {threat.ioc_type}: {threat.ioc_value}
-                    </span>
-                    {threat.associated_iocs && threat.associated_iocs.length > 0 && (
-                      <span className="text-xs text-slate-600">+{threat.associated_iocs.length}</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-600 mt-0.5">
-                    {threat.confidence}% confidence · {timeAgo(threat.first_seen)}
-                  </div>
+                <p className="mb-1 fw-medium" style={{ fontSize: '0.85rem' }}>{threat.title}</p>
+                <div className="d-flex align-items-center gap-2 mb-1">
+                  <span className={iocBadgeCls(threat.ioc_type)} style={{ maxWidth: 200 }}>
+                    {threat.ioc_type}: {threat.ioc_value}
+                  </span>
+                  {threat.associated_iocs && threat.associated_iocs.length > 0 && (
+                    <span className="text-muted" style={{ fontSize: '0.72rem' }}>+{threat.associated_iocs.length}</span>
+                  )}
                 </div>
-                {/* Add button */}
-                <button
-                  onClick={() => onAddToIOC(threat)}
-                  disabled={isAdded}
-                  title={isAdded ? 'Already in IOC Register' : 'Add to IOC Register'}
-                  className={`flex-shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-all ${
-                    isAdded
-                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 cursor-default'
-                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-cyan-500/15 hover:text-cyan-400 hover:border-cyan-500/30'
-                  }`}
-                >
-                  {isAdded ? <CheckCircle2 size={11} /> : <PlusCircle size={11} />}
-                  {isAdded ? 'Added' : 'Add'}
-                </button>
+                <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+                  {threat.confidence}% confidence · {timeAgo(threat.first_seen)}
+                </div>
               </div>
-            );
-          })}
-        </div>
+              <Button size="sm" variant={isAdded ? 'outline-success' : 'outline-secondary'}
+                disabled={isAdded} onClick={() => onAddToIOC(threat)}
+                className="d-flex align-items-center gap-1 flex-shrink-0" style={{ fontSize: '0.7rem' }}>
+                {isAdded ? <CheckCircle size={10} /> : <PlusCircle size={10} />}
+                {isAdded ? 'Added' : 'Add'}
+              </Button>
+            </div>
+          );
+        })}
+      </Offcanvas.Body>
 
-        {/* Footer */}
-        <div className="px-5 py-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-600">
-          <span>IPsum (CC0) · MISP Galaxy (CC0)</span>
-          <button onClick={onRefresh} disabled={loading}
-            className="flex items-center gap-1 text-slate-500 hover:text-slate-300 disabled:opacity-40">
-            <RefreshCw size={11} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
-        </div>
+      <div className="d-flex align-items-center justify-content-between px-3 py-2 border-top"
+        style={{ fontSize: '0.72rem', color: '#6c757d' }}>
+        <span>IPsum (CC0) · MISP Galaxy (CC0)</span>
+        <Button variant="link" size="sm" className="p-0 text-muted d-flex align-items-center gap-1"
+          onClick={onRefresh} disabled={loading} style={{ fontSize: '0.72rem' }}>
+          <RefreshCw size={11} className={loading ? 'spin' : ''} /> Refresh
+        </Button>
       </div>
-    </div>
+    </Offcanvas>
   );
 }
-
-// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Threats() {
   const [liveThreats,   setLiveThreats]   = useState<LiveThreat[]>([]);
@@ -485,8 +434,6 @@ export default function Threats() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  // ── Add to shared IOC store ───────────────────────────────────────────────
-
   const handleAddToIOC = (threat: LiveThreat) => {
     if (addedIds.has(threat.id)) return;
     const ioc   = threatToIOC(threat);
@@ -494,12 +441,10 @@ export default function Threats() {
     setAddedIds(prev => new Set([...prev, threat.id]));
     showToast(
       added > 0
-        ? `"${threat.title}" added to IOC Register — navigate to IOC Register to view`
+        ? `"${threat.title}" added to IOC Register`
         : `"${threat.ioc_value}" already exists in the IOC Register`
     );
   };
-
-  // ── Fetch from proxy ──────────────────────────────────────────────────────
 
   const fetchFeeds = useCallback(async (force = false) => {
     if (!force && lastFetched && Date.now() - lastFetched.getTime() < 5 * 60 * 1000) return;
@@ -510,12 +455,9 @@ export default function Threats() {
       if (!res.ok) throw new Error(`Proxy returned HTTP ${res.status}`);
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Unknown proxy error');
-
       const threats: LiveThreat[] = json.data ?? [];
       const newOnes = threats.filter(t => !prevIdsRef.current.has(t.id));
-      if (newOnes.length > 0 && prevIdsRef.current.size > 0) {
-        setNewCount(n => n + newOnes.length);
-      }
+      if (newOnes.length > 0 && prevIdsRef.current.size > 0) setNewCount(n => n + newOnes.length);
       threats.forEach(t => prevIdsRef.current.add(t.id));
       setLiveThreats(threats);
       setLastFetched(new Date());
@@ -526,14 +468,10 @@ export default function Threats() {
     }
   }, [lastFetched]);
 
-  // ── Countdown + auto-poll ─────────────────────────────────────────────────
-
   const startCountdown = useCallback(() => {
     setCountdown(LIVE_POLL_INTERVAL / 1000);
     if (cdRef.current) clearInterval(cdRef.current);
-    cdRef.current = setInterval(() => {
-      setCountdown(c => c <= 1 ? LIVE_POLL_INTERVAL / 1000 : c - 1);
-    }, 1000);
+    cdRef.current = setInterval(() => setCountdown(c => c <= 1 ? LIVE_POLL_INTERVAL / 1000 : c - 1), 1000);
   }, []);
 
   useEffect(() => {
@@ -560,8 +498,6 @@ export default function Threats() {
     showToast(`IOC "${ioc.value}" added to register`);
   };
 
-  // ── Combine sources ───────────────────────────────────────────────────────
-
   const allThreats = [
     ...liveThreats,
     ...mockThreats.map(t => ({ ...t } as unknown as LiveThreat)),
@@ -583,39 +519,38 @@ export default function Threats() {
   const liveCnt      = liveThreats.length;
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-screen-2xl relative">
-
+    <div className="progrec-page p-3 p-lg-4">
       {addIOCOpen && <AddIOCModal onClose={() => setAddIOCOpen(false)} onSubmit={handleAddIOCManual} />}
 
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm px-4 py-3 rounded-xl shadow-xl backdrop-blur">
-          <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />{toast}
+        <div className="pg-toast">
+          <CheckCircle size={16} color="#4BBF73" />
+          <span>{toast}</span>
         </div>
       )}
 
-      {livePanelOpen && (
-        <LiveFeedDrawer
-          onClose={() => { setLivePanelOpen(false); setNewCount(0); }}
-          threats={liveThreats}
-          loading={loading}
-          fetchError={fetchError}
-          onRefresh={() => fetchFeeds(true)}
-          lastFetched={lastFetched}
-          countdown={countdown}
-          paused={paused}
-          onTogglePause={() => setPaused(p => !p)}
-          newCount={newCount}
-          onClearNew={() => setNewCount(0)}
-          addedIds={addedIds}
-          onAddToIOC={handleAddToIOC}
-        />
-      )}
+      <LiveFeedDrawer
+        show={livePanelOpen}
+        onClose={() => { setLivePanelOpen(false); setNewCount(0); }}
+        threats={liveThreats}
+        loading={loading}
+        fetchError={fetchError}
+        onRefresh={() => fetchFeeds(true)}
+        lastFetched={lastFetched}
+        countdown={countdown}
+        paused={paused}
+        onTogglePause={() => setPaused(p => !p)}
+        newCount={newCount}
+        onClearNew={() => setNewCount(0)}
+        addedIds={addedIds}
+        onAddToIOC={handleAddToIOC}
+      />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Page header */}
+      <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 mb-4">
         <div>
-          <h2 className="text-slate-100 font-bold text-xl">Threat Intelligence</h2>
-          <p className="text-slate-500 text-sm">
+          <h4 className="fw-bold mb-1">Threat Intelligence</h4>
+          <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>
             {loading
               ? 'Fetching live indicators…'
               : liveCnt > 0
@@ -625,123 +560,140 @@ export default function Threats() {
               : 'Aggregated threat feeds and manual intelligence'}
           </p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => fetchFeeds(true)} disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800 text-sm transition-colors disabled:opacity-50">
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
-          <button onClick={handleOpenLivePanel}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-600/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-semibold text-sm transition-colors">
-            <Radio size={16} className={liveCnt > 0 ? 'animate-pulse' : ''} />
+        <div className="d-flex gap-2">
+          <Button variant="outline-secondary" size="sm" onClick={() => fetchFeeds(true)} disabled={loading}
+            className="d-flex align-items-center gap-2">
+            <RefreshCw size={15} className={loading ? 'spin' : ''} /> Refresh
+          </Button>
+          <Button variant="outline-success" size="sm" onClick={handleOpenLivePanel}
+            className="d-flex align-items-center gap-2">
+            <Radio size={15} className={liveCnt > 0 ? 'live-dot-icon' : ''} />
             Live Feed
-            {liveCnt > 0 && <span className="bg-emerald-500/20 text-emerald-300 text-xs px-1.5 py-px rounded-full">{liveCnt}</span>}
-            {newCount > 0 && <span className="bg-cyan-500/20 text-cyan-300 text-xs px-1.5 py-px rounded-full">+{newCount}</span>}
-          </button>
-          <button onClick={() => setAddIOCOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold text-sm transition-colors">
-            <Plus size={16} /> Add IOC
-          </button>
+            {liveCnt > 0 && <Badge bg="success" pill>{liveCnt}</Badge>}
+            {newCount > 0 && <Badge bg="primary" pill>+{newCount}</Badge>}
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => setAddIOCOpen(true)}
+            className="d-flex align-items-center gap-2">
+            <Plus size={15} /> Add IOC
+          </Button>
         </div>
       </div>
 
-      {/* Source badges */}
+      {/* Live source badges */}
       {liveCnt > 0 && (
-        <div className="flex flex-wrap gap-3">
+        <div className="d-flex flex-wrap gap-2 mb-4">
           {[
-            { label: 'IPsum',           desc: 'Malicious IP clusters', count: liveThreats.filter(t => t.source.includes('IPsum')).length,       color: 'text-red-400'    },
-            { label: 'MISP Ransomware', desc: 'Active families',       count: liveThreats.filter(t => t.source.includes('Ransomware')).length,   color: 'text-purple-400' },
-            { label: 'MISP Actors',     desc: 'APT / threat groups',   count: liveThreats.filter(t => t.source.includes('Threat Actor')).length, color: 'text-blue-400'   },
+            { label: 'IPsum',           desc: 'Malicious IP clusters', count: liveThreats.filter(t => t.source.includes('IPsum')).length,       color: '#d9534f'  },
+            { label: 'MISP Ransomware', desc: 'Active families',       count: liveThreats.filter(t => t.source.includes('Ransomware')).length,   color: '#6f42c1' },
+            { label: 'MISP Actors',     desc: 'APT / threat groups',   count: liveThreats.filter(t => t.source.includes('Threat Actor')).length, color: '#3B82EC' },
           ].map(src => (
             <button key={src.label} onClick={handleOpenLivePanel}
-              className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 hover:border-slate-600 rounded-lg px-3 py-2 text-xs transition-colors">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-slate-300 font-medium">{src.label}</span>
-              <span className="text-slate-500">{src.desc}</span>
-              <span className={`font-semibold ${src.color}`}>{src.count}</span>
+              className="btn btn-light border d-flex align-items-center gap-2"
+              style={{ fontSize: '0.78rem', borderRadius: 8 }}>
+              <span className="live-dot" style={{ width: 7, height: 7 }} />
+              <span className="fw-medium">{src.label}</span>
+              <span className="text-muted">{src.desc}</span>
+              <span className="fw-semibold" style={{ color: src.color }}>{src.count}</span>
             </button>
           ))}
           {addedIds.size > 0 && (
-            <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 text-xs text-emerald-400">
-              <CheckCircle2 size={12} /> {addedIds.size} added to IOC Register
+            <div className="d-flex align-items-center gap-1 px-3 py-1 rounded-3 border"
+              style={{ background: 'rgba(75,191,115,0.08)', borderColor: 'rgba(75,191,115,0.3)', color: '#4BBF73', fontSize: '0.78rem' }}>
+              <CheckCircle size={13} /> {addedIds.size} added to IOC Register
             </div>
           )}
         </div>
       )}
 
-      {/* Proxy offline banner */}
+      {/* Proxy offline alert */}
       {fetchError && liveCnt === 0 && (
-        <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-sm">
-          <AlertTriangle size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
+        <div className="alert alert-warning d-flex align-items-start gap-3 mb-4" role="alert">
+          <AlertTriangle size={16} className="flex-shrink-0 mt-1" />
           <div>
-            <p className="text-amber-300 font-medium">Proxy server not running</p>
-            <p className="text-amber-500/80 text-xs mt-1">
-              Open a terminal and run: <code className="bg-slate-800 text-cyan-400 px-2 py-0.5 rounded">node threat-proxy.cjs</code>
-            </p>
+            <div className="fw-medium">Proxy server not running</div>
+            <div style={{ fontSize: '0.8rem' }}>
+              Open a terminal and run: <code>node threat-proxy.cjs</code>
+            </div>
           </div>
         </div>
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <Row className="g-3 mb-4">
         {[
-          { label: 'Active Threats', value: activeCnt,    color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/20'       },
-          { label: 'Critical',       value: critCnt,      color: 'text-orange-400',  bg: 'bg-orange-500/10 border-orange-500/20'  },
-          { label: 'Mitigated',      value: mitigatedCnt, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+          { label: 'Active Threats', value: activeCnt,    cls: 'stat-card-danger',   color: '#d9534f'  },
+          { label: 'Critical',       value: critCnt,      cls: 'stat-card-warning',  color: '#fd7e14'  },
+          { label: 'Mitigated',      value: mitigatedCnt, cls: 'stat-card-success',  color: '#4BBF73'  },
         ].map(s => (
-          <div key={s.label} className={`rounded-xl border p-4 ${s.bg}`}>
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-slate-400 text-sm">{s.label}</p>
-          </div>
+          <Col key={s.label} xs={4}>
+            <Card className={`shadow-sm border h-100 ${s.cls}`}>
+              <Card.Body className="py-3 px-3">
+                <div className="fw-bold mb-1" style={{ fontSize: '1.5rem', color: s.color }}>{s.value}</div>
+                <div className="text-muted" style={{ fontSize: '0.8rem' }}>{s.label}</div>
+              </Card.Body>
+            </Card>
+          </Col>
         ))}
-      </div>
+      </Row>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-700">
-        {(['feeds', 'actors'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
-              tab === t ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-500 hover:text-slate-300'
-            }`}>
-            {t === 'feeds' ? `Threat Feeds (${filtered.length})` : 'Threat Actors'}
-          </button>
-        ))}
-      </div>
+      <Nav variant="tabs" className="mb-3" activeKey={tab} onSelect={k => setTab(k as 'feeds' | 'actors')}>
+        <Nav.Item>
+          <Nav.Link eventKey="feeds">
+            Threat Feeds {tab === 'feeds' && <Badge bg="primary" pill className="ms-1">{filtered.length}</Badge>}
+          </Nav.Link>
+        </Nav.Item>
+        <Nav.Item>
+          <Nav.Link eventKey="actors">Threat Actors</Nav.Link>
+        </Nav.Item>
+      </Nav>
 
       {tab === 'feeds' ? (
         <>
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2 flex-1">
-              <Search size={16} className="text-slate-500" />
-              <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Search threats, IOCs, families…"
-                className="bg-transparent text-slate-300 text-sm outline-none flex-1 placeholder:text-slate-600" />
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {[
-                { val: category,     set: setCategory,     opts: CATEGORIES },
-                { val: status,       set: setStatus,       opts: STATUSES   },
-                { val: sourceFilter, set: setSourceFilter, opts: SOURCES    },
-              ].map((f, i) => (
-                <div key={i} className="relative">
-                  <select value={f.val} onChange={e => f.set(e.target.value)}
-                    className="appearance-none bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 pr-8 outline-none focus:border-cyan-500 cursor-pointer">
-                    {f.opts.map(o => <option key={o}>{o}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2 top-3 text-slate-500 pointer-events-none" />
-                </div>
-              ))}
-            </div>
-          </div>
+          <Row className="g-2 mb-3">
+            <Col xs={12} md={4}>
+              <InputGroup size="sm">
+                <InputGroup.Text className="bg-white border-end-0">
+                  <Search size={14} color="#6c757d" />
+                </InputGroup.Text>
+                <Form.Control
+                  value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Search threats, IOCs, families…"
+                  className="border-start-0 ps-0"
+                />
+              </InputGroup>
+            </Col>
+            <Col xs="auto" key="cat-filter">
+              <Form.Select size="sm" value={category} onChange={e => setCategory(e.target.value)}>
+                {CATEGORIES.map(o => <option key={`cat-${o}`} value={o}>{o}</option>)}
+              </Form.Select>
+            </Col>
+            <Col xs="auto" key="status-filter">
+              <Form.Select size="sm" value={status} onChange={e => setStatus(e.target.value)}>
+                {STATUSES.map(o => <option key={`st-${o}`} value={o}>{o}</option>)}
+              </Form.Select>
+            </Col>
+            <Col xs="auto" key="src-filter">
+              <Form.Select size="sm" value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}>
+                {SOURCES.map(o => <option key={`src-${o}`} value={o}>{o}</option>)}
+              </Form.Select>
+            </Col>
+          </Row>
 
           {loading && allThreats.length === 0 ? (
-            <div className="space-y-3">
+            <div>
               {[1,2,3].map(n => (
-                <div key={n} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 animate-pulse h-24" />
+                <Card key={n} className="mb-3 shadow-sm placeholder-glow">
+                  <Card.Body className="py-3">
+                    <div className="placeholder col-12 mb-2" style={{ height: 16, borderRadius: 4 }} />
+                    <div className="placeholder col-8" style={{ height: 12, borderRadius: 4 }} />
+                  </Card.Body>
+                </Card>
               ))}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div>
               {filtered.map(threat => {
                 const isLive = threat.source.includes('IPsum') || threat.source.includes('MISP') || threat.source.includes('abuse.ch');
                 return (
@@ -755,49 +707,65 @@ export default function Threats() {
                 );
               })}
               {filtered.length === 0 && (
-                <div className="py-16 text-center text-slate-500 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                  No threats match the current filters.
-                </div>
+                <Card className="shadow-sm">
+                  <Card.Body className="py-5 text-center text-muted">
+                    No threats match the current filters.
+                  </Card.Body>
+                </Card>
               )}
             </div>
           )}
         </>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Row className="g-3">
           {mockThreatActors.map(actor => (
-            <div key={actor.id} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-slate-100 font-semibold">{actor.name}</h3>
-                  <p className="text-slate-500 text-xs mt-0.5">{actor.type} · {actor.sophistication} sophistication</p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${actor.active ? 'bg-red-500 animate-pulse' : 'bg-slate-600'}`} />
-                  <span className={`text-xs font-medium ${actor.active ? 'text-red-400' : 'text-slate-500'}`}>
-                    {actor.active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-1">Motivation</p>
-                <div className="flex flex-wrap gap-1">
-                  {actor.motivation.map(m => (
-                    <span key={m} className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded">{m}</span>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 mb-1">Target Sectors</p>
-                <div className="flex flex-wrap gap-1">
-                  {actor.target_sectors.map(s => (
-                    <span key={s} className="text-xs bg-slate-700/50 text-slate-400 px-2 py-0.5 rounded">{s}</span>
-                  ))}
-                </div>
-              </div>
-              <p className="text-xs text-slate-600">Last seen: {actor.last_seen}</p>
-            </div>
+            <Col key={actor.id} md={6}>
+              <Card className="shadow-sm h-100">
+                <Card.Body>
+                  <div className="d-flex align-items-start justify-content-between gap-3 mb-3">
+                    <div>
+                      <h6 className="fw-semibold mb-0">{actor.name}</h6>
+                      <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                        {actor.type} · {actor.sophistication} sophistication
+                      </div>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <span style={{
+                        width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+                        background: actor.active ? '#d9534f' : '#adb5bd',
+                        animation: actor.active ? 'pg-pulse 1.5s infinite' : 'none',
+                      }} />
+                      <span className={`fw-medium`} style={{ fontSize: '0.78rem', color: actor.active ? '#d9534f' : '#6c757d' }}>
+                        {actor.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <div className="text-muted mb-1" style={{ fontSize: '0.72rem' }}>Motivation</div>
+                    <div className="d-flex flex-wrap gap-1">
+                      {actor.motivation.map(m => (
+                        <Badge key={m} bg="danger" className="fw-normal" style={{ fontSize: '0.7rem' }}>{m}</Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mb-2">
+                    <div className="text-muted mb-1" style={{ fontSize: '0.72rem' }}>Target Sectors</div>
+                    <div className="d-flex flex-wrap gap-1">
+                      {actor.target_sectors.map(s => (
+                        <span key={s} className="badge rounded-pill"
+                          style={{ background: '#f4f7f9', color: '#495057', border: '1px solid #dee2e6', fontSize: '0.7rem', fontWeight: 400 }}>{s}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="text-muted" style={{ fontSize: '0.72rem' }}>Last seen: {actor.last_seen}</div>
+                </Card.Body>
+              </Card>
+            </Col>
           ))}
-        </div>
+        </Row>
       )}
     </div>
   );
