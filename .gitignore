@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Pre-migration project snapshot and chat screenshots — not part of source
+.migration-backup/
+attached_assets/
