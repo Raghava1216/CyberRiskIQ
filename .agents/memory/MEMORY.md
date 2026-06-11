@@ -1,0 +1,1 @@
+- [Slide deck typography floor](slide-typography.md) — slides export at fixed 1920x1080; keep body ≥2vw, detail ≥1.5vw, and recharts SVG fontSize in px sized against 1920 (≥30px ≈1.5vw).

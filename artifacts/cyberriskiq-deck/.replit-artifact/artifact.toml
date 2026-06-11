@@ -1,0 +1,31 @@
+kind = "slides"
+previewPath = "/cyberriskiq-deck/"
+title = "CyberRisk IQ — Board Deck"
+version = "1.0.0"
+id = "artifacts/cyberriskiq-deck"
+router = "path"
+
+[[integratedSkills]]
+name = "slides"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/cyberriskiq-deck/" ]
+localPort = 20988
+
+[services.development]
+run = "pnpm --filter @workspace/cyberriskiq-deck run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/cyberriskiq-deck", "run", "build" ]
+publicDir = "artifacts/cyberriskiq-deck/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20988"
+BASE_PATH = "/cyberriskiq-deck/"

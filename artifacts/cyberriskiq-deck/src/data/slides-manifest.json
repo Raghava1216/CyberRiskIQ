@@ -1,0 +1,98 @@
+[
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e01",
+    "position": 1,
+    "filepath": "src/pages/slides/Cover.tsx",
+    "title": "CyberRisk IQ",
+    "description": "Title slide — cyber risk in euros, compliance on autopilot; board & industry review.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e02",
+    "position": 2,
+    "filepath": "src/pages/slides/ExecutiveSummary.tsx",
+    "title": "Executive summary",
+    "description": "CyberRisk IQ prices cyber risk in euros and automates multi-framework compliance; decision requested.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e03",
+    "position": 3,
+    "filepath": "src/pages/slides/Problem.tsx",
+    "title": "The problem",
+    "description": "Mid-market firms cannot price cyber risk or keep pace with new EU regulation.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e04",
+    "position": 4,
+    "filepath": "src/pages/slides/MarketWindow.tsx",
+    "title": "Market window",
+    "description": "Regulation and market growth have opened a mid-market window now; CRQ market chart.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e05",
+    "position": 5,
+    "filepath": "src/pages/slides/TwoPillars.tsx",
+    "title": "Two pillars",
+    "description": "Two pillars share one risk engine: quantification and compliance.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e06",
+    "position": 6,
+    "filepath": "src/pages/slides/PerRiskModel.tsx",
+    "title": "Per-risk model",
+    "description": "Every risk carries a euro value, a recovery profile, and a mitigation ROI.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e07",
+    "position": 7,
+    "filepath": "src/pages/slides/FairMonteCarlo.tsx",
+    "title": "FAIR + Monte Carlo",
+    "description": "Every euro traces to the open FAIR standard run through Monte Carlo simulation.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e08",
+    "position": 8,
+    "filepath": "src/pages/slides/RegulatoryCoverage.tsx",
+    "title": "Regulatory coverage",
+    "description": "One assessment drives DORA, NIS2, EU AI Act and SEC reporting.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e09",
+    "position": 9,
+    "filepath": "src/pages/slides/Competitive.tsx",
+    "title": "Competitive positioning",
+    "description": "The only CRQ and GRC platform priced for the mid-market.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e10",
+    "position": 10,
+    "filepath": "src/pages/slides/Architecture.tsx",
+    "title": "Architecture",
+    "description": "A five-layer, event-driven architecture scales from prototype to production.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e11",
+    "position": 11,
+    "filepath": "src/pages/slides/Roadmap.tsx",
+    "title": "Roadmap",
+    "description": "A working prototype is built; phased delivery makes it production-ready.",
+    "speakerNotes": ""
+  },
+  {
+    "id": "9c1f0b3a-1a2b-4c4d-8e5f-0a1b2c3d4e12",
+    "position": 12,
+    "filepath": "src/pages/slides/Ask.tsx",
+    "title": "The ask",
+    "description": "We request approval to proceed to MVP and engage design partners.",
+    "speakerNotes": ""
+  }
+]
