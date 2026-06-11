@@ -12,3 +12,9 @@ id = "XEJI5Ne5HvYEJ_wEVBl3F"
 uri = "file://docs/CyberRiskIQ_Product_and_Architecture_Briefing.md"
 type = "text"
 title = "CyberRisk IQ — Complete Product & Architecture Briefing"
+
+[[outputs]]
+id = "l7h-IWsgCw0zcfGMpNLNV"
+uri = "file://docs/CyberRiskIQ_Board_Document.md"
+type = "text"
+title = "CyberRisk IQ — Board Submission Document"
