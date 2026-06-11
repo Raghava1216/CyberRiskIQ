@@ -1,0 +1,63 @@
+/* ── Enterprise GRC "application model" primitives ──
+   Mirrors the reportChart-cards / underline-nav conventions from the
+   user's platform, themed to the CyberRisk IQ teal accent. */
+
+:root {
+  --cr-accent: #0E6E63;
+}
+
+.pg-app {
+  font-family: 'Poppins', sans-serif;
+  min-height: 100vh;
+  background: var(--pg-surface-2, #f9fafb);
+}
+
+.pg-app-body {
+  padding: 12px 16px 32px;
+}
+
+/* Card primitive used across LandingPagesTitle, DashboardCards, FormReportChartLink */
+.reportChart-cards {
+  border: none;
+  border-radius: 4px;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.28);
+  background: var(--pg-surface, #fff);
+}
+
+.reportChart-cards > .card-body,
+.reportChart-cards.card {
+  padding: 0.65rem 0.85rem;
+}
+
+.reportChart-cards h4 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--pg-text-primary, #101828);
+}
+
+/* Underline tab strip */
+.nav-underline .nav-link {
+  color: var(--pg-text-muted, #667085);
+  font-size: 0.82rem;
+  font-weight: 500;
+  border-bottom-width: 2px;
+}
+.nav-underline .nav-link:hover {
+  color: var(--cr-accent, #0E6E63);
+}
+.nav-underline .nav-link.active {
+  color: var(--cr-accent, #0E6E63);
+  font-weight: 600;
+  border-bottom-color: var(--cr-accent, #0E6E63);
+}
+
+/* FormReportChartLink links */
+.reportChart-cards .clickable {
+  color: var(--pg-text-primary, #101828);
+}
+.reportChart-cards .clickable:hover {
+  color: var(--cr-accent, #0E6E63);
+}
+
+/* Sticky landing title sits below the 62px top bar */
+.sticky-top.cr-landing { top: 62px; }
