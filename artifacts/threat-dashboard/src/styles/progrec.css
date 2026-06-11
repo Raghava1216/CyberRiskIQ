@@ -32,8 +32,8 @@
   color: var(--pg-text-primary);
   min-height: 100%;
 
-  --bs-primary:     #3B82EC;
-  --bs-primary-rgb: 59, 130, 236;
+  --bs-primary:     #0E6E63;
+  --bs-primary-rgb: 14, 110, 99;
   --bs-success:     #4BBF73;
   --bs-success-rgb: 75, 191, 115;
   --bs-danger:      #d9534f;
@@ -43,8 +43,8 @@
   --bs-info:        #1F9BCF;
   --bs-body-font-family: 'Poppins', sans-serif;
 
-  --pg-primary:      #3B82EC;
-  --pg-primary-dark: #1659c7;
+  --pg-primary:      #0E6E63;
+  --pg-primary-dark: #0a544c;
   --pg-success:      #4BBF73;
   --pg-danger:       #d9534f;
   --pg-warning:      #f0ad4e;
@@ -115,7 +115,7 @@
 [data-bs-theme="dark"] .progrec-page .nav-tabs .nav-link.active {
   background-color: var(--pg-surface);
   border-color: var(--pg-border) var(--pg-border) var(--pg-surface);
-  color: #3B82EC;
+  color: #0E6E63;
 }
 
 /* Inline-style colour overrides for dark mode ─────────────────────────────── */

@@ -1,1 +1,3 @@
 - [recharts in this monorepo](recharts-vite-monorepo.md) — v2 (threat-dashboard) vs v3 (deck) isolated per-artifact; "useRef of null" on first dev load is a transient optimize artifact, restart to clear.
+- [slide typography](slide-typography.md) — slide-deck font/type-scale conventions for the cyberriskiq-deck artifact.
+- [sandbox git restore + validation parity](sandbox-git-restore.md) — destructive git is blocked; restore via `git show <commit>:<path>` redirect; the validation gate enforces feature/UI parity, so a re-skin must preserve all features.

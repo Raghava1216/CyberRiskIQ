@@ -1,6 +1,6 @@
-# CyberRiskIQ
+# [Project name]
 
-An enterprise cyber GRC platform: a threat & risk posture dashboard (web app) plus a board/industry pitch deck (slides), backed by a shared API server.
+_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
 
 ## Run & Operate
 
@@ -22,26 +22,15 @@ An enterprise cyber GRC platform: a threat & risk posture dashboard (web app) pl
 
 ## Where things live
 
-- `artifacts/threat-dashboard` — main GRC web app (React + Vite + React-Bootstrap).
-  - `src/platform/` — the "application model" layer: `reports.ts` + `charts.ts` registries (CR_* ids → mockData), `currentUser.ts` (CR_* privileges), `format.ts`, `i18n.ts`, `pageProps.ts`, `types.ts`.
-  - `src/components/reports/Report.tsx` — `ReportRuntime` (table / dataCard / pivotTable).
-  - `src/components/charts/Chart.tsx` — recharts-backed `Chart` runtime.
-  - `src/components/pages/` — `LandingPagesTitle`, `StatsCard`, `FormReportChartLink`, `SectionHeaderCard`.
-  - `src/lib/mockData.ts` — source of all dashboard data.
-  - `src/styles/platform.css` — light GRC theme.
-- `artifacts/cyberriskiq-deck` — board/industry slide deck (slides artifact, export-only).
-- `artifacts/api-server` — Express API server (port from `PORT`).
+_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
 
 ## Architecture decisions
 
-- The threat-dashboard mirrors the user's in-house enterprise GRC "application model": a `Tab.Container` landing page (`LandingPagesTitle` with year filter + privilege-gated tab strip), and pages are thin Card/Row/Col compositions of `ReportRuntime report="CR_..."` and `Chart chart="CR_..."`.
-- Module prefix is `CR` (mirrors their `RA`); all report/chart/privilege ids are `CR_*`.
-- Reports/charts are registry-driven: add a CR_* entry to `platform/reports.ts` or `platform/charts.ts`, then reference it by id from a page — no bespoke page code.
-- recharts is pinned to v2 here; the deck uses v3 (isolated per-artifact by pnpm — do not unify).
+_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
 
 ## Product
 
-CyberRiskIQ gives security & risk teams a single posture view: risk register (FAIR / Monte Carlo), threat intel, vulnerabilities, assets, IOCs, incidents, compliance frameworks (DORA/NIS2), reports, and Wazuh SIEM telemetry — gated by CR_* role privileges.
+_Describe the high-level user-facing capabilities of this app once they exist._
 
 ## User preferences
 
