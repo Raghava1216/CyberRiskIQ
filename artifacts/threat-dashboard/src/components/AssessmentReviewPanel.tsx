@@ -356,7 +356,7 @@ export default function AssessmentReviewPanel({
     if (!current) return;
     setSaving(true);
     try {
-      const sc = score !== '' ? parseInt(score, 10) : undefined;
+      const sc = score !== '' ? parseInt(score, 10) : null;
       await updateResult(current.id, { status, score: sc, evidence, notes, reviewed_by: assessedBy });
       setResults(prev => prev.map(r => r.id === current.id ? { ...r, status, score: sc, evidence, notes } : r));
       if (direction === 'next' && currentIdx < total - 1) setCurrentIdx(i => i + 1);

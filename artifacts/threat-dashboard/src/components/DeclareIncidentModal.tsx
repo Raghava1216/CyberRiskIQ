@@ -158,6 +158,11 @@ export default function DeclareIncidentModal({ onClose, onSubmit }: DeclareIncid
         ...form.tags,
         ...(form.affected_systems ? [form.affected_systems.toLowerCase().replace(/\s+/g, '-')] : []),
       ],
+      is_dora_reportable: false,
+      dora_reported: false,
+      financial_impact_estimate: 0,
+      affected_users: 0,
+      downtime_minutes: 0,
     };
     onSubmit(incident);
   };

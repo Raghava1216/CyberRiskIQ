@@ -63,7 +63,7 @@ export async function fetchResults(assessment_id: string): Promise<AssessmentRes
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
 
-  const controlIds = [...new Set(rows.map(r => r.control_id).filter(Boolean))];
+  const controlIds = [...new Set(rows.map((r: AssessmentResult) => r.control_id).filter(Boolean))];
   if (controlIds.length === 0) return rows as AssessmentResult[];
 
   const { data: controls, error: ctrlErr } = await supabase
@@ -72,9 +72,9 @@ export async function fetchResults(assessment_id: string): Promise<AssessmentRes
     .in('id', controlIds);
   if (ctrlErr) throw ctrlErr;
 
-  const controlMap = new Map((controls ?? []).map(c => [c.id, c]));
+  const controlMap = new Map((controls ?? []).map((c: ComplianceControl) => [c.id, c]));
 
-  return rows.map(r => ({
+  return rows.map((r: AssessmentResult) => ({
     ...r,
     control: controlMap.get(r.control_id) ?? null,
   })) as AssessmentResult[];
@@ -139,8 +139,8 @@ export async function completeAssessment(assessment_id: string): Promise<number>
     .neq('status', 'not_applicable');
   if (rowErr) throw rowErr;
 
-  const applicable = rows ?? [];
-  const totalScore = applicable.reduce((sum, r) => {
+  const applicable = (rows ?? []) as Pick<AssessmentResult, 'status' | 'score'>[];
+  const totalScore = applicable.reduce((sum: number, r) => {
     if (r.status === 'compliant')    return sum + (r.score ?? 100);
     if (r.status === 'partial')      return sum + (r.score ?? 50);
     if (r.status === 'noncompliant') return sum + (r.score ?? 0);
