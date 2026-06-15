@@ -1,45 +1,29 @@
 import React from "react";
 import { Helmet } from "react-helmet-async";
 import { Container, Row, Col } from "react-bootstrap";
-import { useTranslation } from "react-i18next";
 
-import FormReportChartLink from "src/components/pages/FormReportChartLink";
-import ReportRuntime from "src/components/reports/Report";
-import Chart from "src/components/charts/Chart";
+import MockActionBar from "../mock/MockActionBar";
+import MockReport from "../mock/MockReport";
+import MockChart from "../mock/MockChart";
+import { topRisks, riskSeverityMix, aleByBusinessUnit } from "../mock/mockData";
 
-// Risk register — financially quantified risk scenarios (ALE). The register is
-// largely auto-populated from CRQ output; the Risk Manager reviews/approves.
-const Risks = ({ year, refreshCharts }) => {
-  const { t } = useTranslation("common");
-
-  const forms = [
-    { title: t("Risk Scenario"), form: "cyberrisk_risk", privilege: "CR_CREATE_RISK", upload: true },
-  ];
-
-  const reports = [
-    { title: t("Risk Register"), report: "CR_RPT_RISKS", privilege: "CR_VIEW_RISK" },
-    { title: t("Risks Pending Review"), report: "CR_RPT_RISKS_PENDING", privilege: "CR_VIEW_RISK" },
-  ];
-
-  const combinedItems = [
-    ...forms.map((item) => ({ ...item, type: "form" })),
-    ...reports.map((item) => ({ ...item, type: "report" })),
-  ];
-
+// Risk register. Temporary mock data — replace with <FormReportChartLink/> +
+// <ReportRuntime/> + <Chart/> (real keys) when backend metadata exists.
+const Risks = () => {
   return (
     <>
       <Helmet title="CyberRisk IQ — Risk Register" />
       <Container fluid className="p-0 m-0">
-        <FormReportChartLink combinedItems={combinedItems} />
+        <MockActionBar actions={[{ label: "+ Risk Scenario" }, { label: "Import Risks", variant: "outline-secondary" }]} />
         <Row className="p-0 m-0">
-          <ReportRuntime report="CR_RPT_RISKS" yearProp={year} dataCard key={refreshCharts} />
+          <MockReport title="Risk Register" columns={topRisks.columns} rows={topRisks.rows} dataCard />
         </Row>
         <Row className="p-0 m-0">
-          <Col md={6}>
-            <Chart chart="CR_CHT_RISK_SEVERITY" yearProp={year} key={refreshCharts} type="risk" />
+          <Col md={6} className="d-flex">
+            <MockChart title="Risk Severity Mix" type="donut" data={riskSeverityMix} />
           </Col>
-          <Col md={6}>
-            <Chart chart="CR_CHT_ALE_BY_BU" yearProp={year} key={refreshCharts} />
+          <Col md={6} className="d-flex">
+            <MockChart title="ALE by Business Unit" type="bar" data={aleByBusinessUnit} />
           </Col>
         </Row>
       </Container>

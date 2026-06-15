@@ -1,50 +1,34 @@
 import React from "react";
 import { Helmet } from "react-helmet-async";
 import { Container, Row, Col } from "react-bootstrap";
-import { useTranslation } from "react-i18next";
 
-import ReportRuntime from "src/components/reports/Report";
-import Chart from "src/components/charts/Chart";
-import FormReportChartLink from "src/components/pages/FormReportChartLink";
+import MockChart from "../mock/MockChart";
+import MockReport from "../mock/MockReport";
+import { complianceReadiness, aiActInventory, doraRegister, nis2Obligations } from "../mock/mockData";
 
-// Composed regulatory sub-view — live, financially quantified registers for
-// DORA, NIS2 and the EU AI Act, plus obligation status and evidence links.
-const RegulatoryOverview = ({ year, refreshCharts }) => {
-  const { t } = useTranslation("common");
-
-  const reports = [
-    { title: t("DORA ICT Risk Register"), report: "CR_RPT_DORA_REGISTER", privilege: "CR_VIEW_COMPLIANCE" },
-    { title: t("NIS2 Obligations"), report: "CR_RPT_NIS2_OBLIGATIONS", privilege: "CR_VIEW_COMPLIANCE" },
-    { title: t("EU AI Act Inventory"), report: "CR_RPT_AI_ACT_INVENTORY", privilege: "CR_VIEW_COMPLIANCE" },
-  ];
-  const combinedItems = [...reports.map((item) => ({ ...item, type: "report" }))];
-
+// Composed regulatory sub-view — financially quantified registers for DORA, NIS2
+// and the EU AI Act. Rendered with temporary mock data so it loads without backend
+// metadata. Replace MockChart/MockReport with the real <Chart/> + <ReportRuntime/>
+// + <FormReportChartLink/> (real keys) when ready.
+const RegulatoryOverview = () => {
   return (
     <>
       <Helmet title="Regulatory Compliance" />
       <Container fluid className="p-0 m-0">
         <Row className="p-0 m-0">
-          <ReportRuntime report="CR_RPT_COMPLIANCE_STATUS" yearProp={year} dataCard key={refreshCharts} />
-        </Row>
-        <Row className="p-0 m-0">
-          <Col md={4}>
-            <Chart chart="CR_CHT_DORA_READINESS" yearProp={year} refreshCharts={refreshCharts} />
+          <Col md={6} className="d-flex">
+            <MockChart title="Framework Readiness (%)" type="bar" data={complianceReadiness} />
           </Col>
-          <Col md={4}>
-            <Chart chart="CR_CHT_NIS2_OBLIGATIONS" yearProp={year} refreshCharts={refreshCharts} />
-          </Col>
-          <Col md={4}>
-            <Chart chart="CR_CHT_AI_ACT_RISK" yearProp={year} refreshCharts={refreshCharts} />
+          <Col md={6} className="d-flex">
+            <MockChart title="EU AI Act Inventory" type="donut" data={aiActInventory} />
           </Col>
         </Row>
         <Row className="p-0 m-0">
-          <Col>
-            <ReportRuntime report="CR_RPT_DORA_REGISTER" yearProp={year} />
+          <Col md={6} className="d-flex">
+            <MockReport title="DORA ICT Risk Register" columns={doraRegister.columns} rows={doraRegister.rows} />
           </Col>
-        </Row>
-        <Row className="p-0 m-0">
-          <Col>
-            <FormReportChartLink combinedItems={combinedItems} />
+          <Col md={6} className="d-flex">
+            <MockReport title="NIS2 Obligations" columns={nis2Obligations.columns} rows={nis2Obligations.rows} />
           </Col>
         </Row>
       </Container>

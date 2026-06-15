@@ -57,6 +57,43 @@ cyberrisk/
 - **Import paths** are absolute `src/...` except `AuditTrail`, imported relatively from the
   `forms/` folder: `../../../components/forms/reactformutils/elements/AuditTrail`.
 
+## 2a. TEMPORARY MOCK MODE (currently active)
+
+The pages and `*Overview.jsx` sub-views currently render **self-contained mock
+widgets with static sample data** instead of the metadata-driven `<ReportRuntime/>`
+and `<Chart/>`. This is deliberate: the placeholder `CR_RPT_*` / `CR_CHT_*` keys have
+no backend metadata, so `GET /report/meta/<KEY>` and `GET /chart/meta/<KEY>` return
+500 and crash the tab. Mock mode makes **every tab load with zero network calls** so
+you can wire up the backend metadata at your own pace.
+
+What mock mode uses (folder `mock/`, no new dependencies — React + react-bootstrap +
+inline SVG only):
+
+- `mock/MockReport.jsx`   → temporary stand-in for `<ReportRuntime/>` (styled table)
+- `mock/MockChart.jsx`    → temporary stand-in for `<Chart/>` (bar / donut / line, inline SVG)
+- `mock/MockCards.jsx`    → temporary stand-in for `<DashboardCards/>` (KPI cards)
+- `mock/MockActionBar.jsx`→ temporary stand-in for the `<FormReportChartLink/>` link/action bar (inert buttons)
+- `mock/mockData.js`      → all the sample datasets (assets, risks, ALE, compliance, blast radius, Wazuh, …)
+
+**How to switch back to the real platform, tab by tab** (do this once the matching
+backend report/chart/form metadata exists):
+
+1. In the page/sub-view, swap the mock import for the real component, e.g.
+   replace `import MockReport from "../mock/MockReport"` with
+   `import ReportRuntime from "src/components/reports/Report"`.
+2. Replace the JSX, mapping the mock prop to the real key:
+   - `<MockReport title=... columns=... rows=... />` → `<ReportRuntime report="CR_RPT_REAL_KEY" yearProp={year} dataCard key={refreshCharts} />`
+   - `<MockChart title=... type=... data=... />`     → `<Chart chart="CR_CHT_REAL_KEY" yearProp={year} refreshCharts={refreshCharts} />`
+   - `<MockCards cards=... />`                        → your real `<DashboardCards/>`
+   - `<MockActionBar actions=... />`                  → `<FormReportChartLink combinedItems={...} />`
+3. Re-add the `{ year, refreshCharts }` props to the page/sub-view signature (mock
+   components don't use them; the real ones do). The parent `CyberRiskDashboard.jsx`
+   already passes them down.
+4. Delete the `mock/` folder once every tab is on real metadata.
+
+The original metadata-driven wiring (real component usage + the intended placeholder
+keys) is preserved in git history if you want to diff against it.
+
 ## 3. Placeholders to replace with your real backend metadata
 
 All `report="CR_RPT_*"`, `chart="CR_CHT_*"`, `form/formService="cyberrisk_*"`, and

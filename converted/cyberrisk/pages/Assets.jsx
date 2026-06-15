@@ -1,43 +1,31 @@
 import React from "react";
 import { Helmet } from "react-helmet-async";
 import { Container, Row } from "react-bootstrap";
-import { useTranslation } from "react-i18next";
 
-import FormReportChartLink from "src/components/pages/FormReportChartLink";
-import ReportRuntime from "src/components/reports/Report";
-
+import MockActionBar from "../mock/MockActionBar";
+import MockReport from "../mock/MockReport";
 import BlastRadiusOverview from "../BlastRadius/BlastRadiusOverview";
+import { assets } from "../mock/mockData";
 
-// Asset register. Create actions + list reports are declared as data and rendered
-// by FormReportChartLink; the main grid is a ReportRuntime. All form/report keys
-// are CyberRisk IQ placeholders — replace with real backend metadata keys.
-const Assets = ({ year, refreshCharts }) => {
-  const { t } = useTranslation("common");
-
-  const forms = [
-    { title: t("Asset"), form: "cyberrisk_asset", privilege: "CR_CREATE_ASSET", upload: true },
-    { title: t("Asset Connection"), form: "cyberrisk_asset_connection", privilege: "CR_CREATE_ASSET", upload: true },
-  ];
-
-  const reports = [
-    { title: t("Assets"), report: "CR_RPT_ASSETS", privilege: "CR_VIEW_ASSET" },
-    { title: t("Internet-Facing Assets"), report: "CR_RPT_ASSETS_INTERNET_FACING", privilege: "CR_VIEW_ASSET" },
-  ];
-
-  const combinedItems = [
-    ...forms.map((item) => ({ ...item, type: "form" })),
-    ...reports.map((item) => ({ ...item, type: "report" })),
-  ];
-
+// Asset register. Rendered with temporary mock data so the tab loads without
+// backend metadata. Replace MockActionBar/MockReport with <FormReportChartLink/>
+// + <ReportRuntime/> (real keys) when ready.
+const Assets = () => {
   return (
     <>
       <Helmet title="CyberRisk IQ — Assets" />
       <Container fluid className="p-0 m-0">
-        <FormReportChartLink combinedItems={combinedItems} />
+        <MockActionBar
+          actions={[
+            { label: "+ Asset" },
+            { label: "+ Asset Connection" },
+            { label: "Import Assets", variant: "outline-secondary" },
+          ]}
+        />
         <Row className="p-0 m-0">
-          <ReportRuntime report="CR_RPT_ASSETS" yearProp={year} key={refreshCharts} />
+          <MockReport title="Assets" columns={assets.columns} rows={assets.rows} dataCard />
         </Row>
-        <BlastRadiusOverview year={year} refreshCharts={refreshCharts} />
+        <BlastRadiusOverview />
       </Container>
     </>
   );

@@ -1,46 +1,33 @@
 import React from "react";
 import { Helmet } from "react-helmet-async";
 import { Container, Row, Col } from "react-bootstrap";
-import { useTranslation } from "react-i18next";
 
-import ReportRuntime from "src/components/reports/Report";
-import Chart from "src/components/charts/Chart";
-import FormReportChartLink from "src/components/pages/FormReportChartLink";
+import MockChart from "../mock/MockChart";
+import MockReport from "../mock/MockReport";
+import { aleByBusinessUnit, riskSeverityMix, exposureTrend, topRisks } from "../mock/mockData";
 
-// Composed CRQ sub-view (RiskOverview/ORMIssues pattern) — financial exposure
-// translated from technical risk: ALE by business unit, top financial risks,
-// and the prioritised "fix these 15 to remove 73% of exposure" report.
-const CrqOverview = ({ year, refreshCharts }) => {
-  const { t } = useTranslation("common");
-
-  const reports = [
-    { title: t("ALE by Business Unit"), report: "CR_RPT_ALE_BY_BU", privilege: "CR_DASHBOARD" },
-    { title: t("Top Financial Risks"), report: "CR_RPT_TOP_RISKS", privilege: "CR_DASHBOARD" },
-  ];
-  const combinedItems = [...reports.map((item) => ({ ...item, type: "report" }))];
-
+// Composed CRQ sub-view — financial exposure translated from technical risk.
+// Rendered with temporary mock data so it loads without backend metadata. Replace
+// MockChart/MockReport with the real <Chart/> + <ReportRuntime/> +
+// <FormReportChartLink/> (real keys) when ready.
+const CrqOverview = () => {
   return (
     <>
       <Helmet title="Cyber Risk Quantification" />
       <Container fluid className="p-0 m-0">
         <Row className="p-0 m-0">
-          <ReportRuntime report="CR_RPT_ALE_TOTAL" yearProp={year} dataCard key={refreshCharts} />
-        </Row>
-        <Row className="p-0 m-0">
-          <Col md={4}>
-            <Chart chart="CR_CHT_ALE_BY_BU" yearProp={year} refreshCharts={refreshCharts} />
+          <Col md={4} className="d-flex">
+            <MockChart title="ALE by Business Unit" type="bar" data={aleByBusinessUnit} />
           </Col>
-          <Col md={4}>
-            <Chart chart="CR_CHT_ALE_DISTRIBUTION" yearProp={year} refreshCharts={refreshCharts} />
+          <Col md={4} className="d-flex">
+            <MockChart title="ALE Distribution" type="donut" data={riskSeverityMix} />
           </Col>
-          <Col md={4}>
-            <Chart chart="CR_CHT_RISK_REDUCTION_ROI" yearProp={year} refreshCharts={refreshCharts} type="risk" />
+          <Col md={4} className="d-flex">
+            <MockChart title="Exposure Trend (€M)" type="line" data={exposureTrend} />
           </Col>
         </Row>
         <Row className="p-0 m-0">
-          <Col>
-            <FormReportChartLink combinedItems={combinedItems} />
-          </Col>
+          <MockReport title="Top Financial Risks" columns={topRisks.columns} rows={topRisks.rows} dataCard />
         </Row>
       </Container>
     </>
