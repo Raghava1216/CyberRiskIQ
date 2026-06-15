@@ -89,7 +89,7 @@ export default function BrowseCVEModal({ onClose, onImport, existingCVEIds }: Br
       if (severity && severity !== 'All')   params.set('severity', severity);
 
       const res = await fetch(`${CVE_LIBRARY_URL}?${params}`);
-      if (!res.ok) throw new Error(`Proxy returned HTTP ${res.status}. Make sure threat-proxy.cjs is running.`);
+      if (!res.ok) throw new Error(`CVE service returned HTTP ${res.status}. Check that the API server is running.`);
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Failed to load CVE library');
       setCves(json.data ?? []);
@@ -279,7 +279,7 @@ export default function BrowseCVEModal({ onClose, onImport, existingCVEIds }: Br
                 <p className="text-amber-300 text-sm font-medium mb-1">Failed to load CVE library</p>
                 <p className="text-slate-500 text-xs leading-relaxed">{error}</p>
                 <p className="text-slate-600 text-xs mt-2">
-                  Make sure the proxy is running: <code className="bg-slate-800 text-cyan-400 px-2 py-0.5 rounded">node threat-proxy.cjs</code>
+                  Check that the API server is running.
                 </p>
               </div>
               <button onClick={fetchCVEs}

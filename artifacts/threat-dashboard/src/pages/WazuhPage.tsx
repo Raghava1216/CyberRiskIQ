@@ -68,15 +68,17 @@ function useWazuh<T>(endpoint: string, enabled = true) {
     setLoading(true); setError(null);
     try {
       const r = await fetch(`${PROXY}${endpoint}`);
-      const j = await r.json().catch(() => ({ success: false, data: [], error: `HTTP ${r.status}` }));
-      if (!j.success && j.error && !j.data) {
-        setError(j.error);
+      const j = await r.json().catch(() => ({ success: false, error: `HTTP ${r.status}` }));
+      if (j.success === false || j.error) {
+        setData(null);
+        setError(j.error || `Request failed (HTTP ${r.status})`);
       } else {
         setData((j.data ?? j) as T);
         setTs(new Date());
       }
     } catch (e) {
-      setError((e as Error).message.includes('fetch') ? 'Proxy not running — start: node threat-proxy.cjs' : (e as Error).message);
+      setData(null);
+      setError((e as Error).message.includes('fetch') ? 'Cannot reach the Wazuh API service.' : (e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -193,14 +195,14 @@ export default function WazuhPage() {
               ) : connected ? (
                 <span className="d-flex align-items-center gap-1" style={{ color: '#4BBF73' }}>
                   <span className="live-dot" style={{ background: '#4BBF73' }} />
-                  Live · {stats.data?.manager.hostname || '192.168.1.212'} · v{stats.data?.manager.version}
+                  Live · {stats.data?.manager?.hostname || 'Wazuh Manager'} · v{stats.data?.manager?.version}
                 </span>
               ) : (
                 <span className="d-flex align-items-center gap-1" style={{ color: '#98a2b3' }}>
                   <RefreshCw size={11} className="spin" /> Connecting…
                 </span>
               )}
-              {connected && <><span style={{ color: '#e4e7ec' }}>·</span><span style={{ color: '#98a2b3' }}>{stats.data?.agents.active || 0} agents active</span></>}
+              {connected && <><span style={{ color: '#e4e7ec' }}>·</span><span style={{ color: '#98a2b3' }}>{stats.data?.agents?.active || 0} agents active</span></>}
             </div>
           </div>
         </div>
@@ -208,9 +210,11 @@ export default function WazuhPage() {
           <button onClick={stats.refetch} disabled={stats.loading} className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2">
             <RefreshCw size={13} className={stats.loading ? 'spin' : ''} /> Refresh all
           </button>
-          <a href="https://192.168.1.212" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2">
-            <ExternalLink size={13} /> Open Wazuh
-          </a>
+          {stats.data?.manager?.hostname && (
+            <a href={`https://${stats.data.manager.hostname}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2">
+              <ExternalLink size={13} /> Open Wazuh
+            </a>
+          )}
         </div>
       </div>
 
@@ -227,18 +231,12 @@ export default function WazuhPage() {
                   <div className="fw-semibold mb-2" style={{ color: '#344054' }}>How to fix:</div>
                   <ol className="mb-0 ps-3" style={{ lineHeight: 2 }}>
                     <li>Credentials are correct — the issue is <strong style={{ color: '#f0ad4e' }}>user permissions</strong></li>
-                    <li>User <code style={{ background: '#f4f7f9', padding: '1px 6px', borderRadius: 4, color: '#3B82EC' }}>pramod</code> needs <code style={{ background: '#f4f7f9', padding: '1px 6px', borderRadius: 4, color: '#3B82EC' }}>agents_admin</code> or <code style={{ background: '#f4f7f9', padding: '1px 6px', borderRadius: 4, color: '#3B82EC' }}>readonly</code> role in Wazuh</li>
+                    <li>The configured API user needs an <code style={{ background: '#f4f7f9', padding: '1px 6px', borderRadius: 4, color: '#3B82EC' }}>agents_admin</code> or <code style={{ background: '#f4f7f9', padding: '1px 6px', borderRadius: 4, color: '#3B82EC' }}>readonly</code> role in Wazuh</li>
                     <li>Minimum: <code style={{ background: '#f4f7f9', padding: '1px 6px', borderRadius: 4, color: '#3B82EC' }}>agents_admin</code> + <code style={{ background: '#f4f7f9', padding: '1px 6px', borderRadius: 4, color: '#3B82EC' }}>events_reader</code></li>
                   </ol>
                 </div>
-                <button onClick={async () => {
-                  try {
-                    const r = await fetch('http://localhost:3001/wazuh/diagnose');
-                    const j = await r.json();
-                    alert(`DIAGNOSE RESULT:\n\n${j.results?.summary?.join('\n') ?? ''}\n\nFIX: ${j.fix ?? ''}`);
-                  } catch { alert('Proxy not running. Start it first: node threat-proxy.cjs'); }
-                }} className="btn btn-sm mt-3 d-flex align-items-center gap-2" style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#f0ad4e' }}>
-                  <Activity size={12} /> Run Diagnosis
+                <button onClick={() => stats.refetch()} disabled={stats.loading} className="btn btn-sm mt-3 d-flex align-items-center gap-2" style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#f0ad4e' }}>
+                  <RefreshCw size={12} className={stats.loading ? 'spin' : ''} /> Retry Connection
                 </button>
               </div>
             </div>

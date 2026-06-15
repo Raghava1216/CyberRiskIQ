@@ -343,9 +343,8 @@ function LiveFeedDrawer({
         {!loading && threats.length === 0 && fetchError && (
           <div className="d-flex flex-column align-items-center justify-content-center text-center px-4 py-5">
             <AlertTriangle size={28} color="#f0ad4e" className="mb-3" />
-            <p className="fw-medium mb-1">Proxy server not running</p>
-            <p className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Start it in a separate terminal:</p>
-            <code className="d-block px-3 py-2 rounded mb-3" style={{ background: '#f4f7f9', color: '#3B82EC', fontSize: '0.78rem' }}>node threat-proxy.cjs</code>
+            <p className="fw-medium mb-1">Threat feed unavailable</p>
+            <p className="text-muted mb-3" style={{ fontSize: '0.8rem' }}>The threat-feeds service could not be reached. Check that the API server is running.</p>
             <Button variant="outline-primary" size="sm" onClick={onRefresh} className="d-flex align-items-center gap-1">
               <RefreshCw size={12} /> Retry
             </Button>
@@ -556,7 +555,7 @@ export default function Threats() {
               : liveCnt > 0
               ? `${liveCnt} live indicators · IPsum · MISP Galaxy · Updated ${lastFetched ? timeAgo(lastFetched.toISOString()) : '—'}`
               : fetchError
-              ? 'Proxy offline — run: node threat-proxy.cjs'
+              ? 'Threat feed unavailable — check the API server'
               : 'Aggregated threat feeds and manual intelligence'}
           </p>
         </div>
@@ -610,9 +609,9 @@ export default function Threats() {
         <div className="alert alert-warning d-flex align-items-start gap-3 mb-4" role="alert">
           <AlertTriangle size={16} className="flex-shrink-0 mt-1" />
           <div>
-            <div className="fw-medium">Proxy server not running</div>
+            <div className="fw-medium">Threat feed unavailable</div>
             <div style={{ fontSize: '0.8rem' }}>
-              Open a terminal and run: <code>node threat-proxy.cjs</code>
+              The threat-feeds service could not be reached. Check that the API server is running.
             </div>
           </div>
         </div>

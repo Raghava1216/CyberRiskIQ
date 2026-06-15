@@ -6,16 +6,30 @@ const router: IRouter = Router();
 // ── Config (from env vars) ────────────────────────────────────────────────────
 
 const WAZUH = {
-  manager_host:       process.env.WAZUH_HOST              || "192.168.1.212",
-  manager_port:       parseInt(process.env.WAZUH_PORT     || "55000", 10),
-  username:           process.env.WAZUH_USERNAME           || "pramod",
-  password:           process.env.WAZUH_PASSWORD           || "",
-  indexer_host:       process.env.WAZUH_HOST              || "192.168.1.212",
+  manager_host:       process.env.WAZUH_HOST                || "",
+  manager_port:       parseInt(process.env.WAZUH_PORT       || "55000", 10),
+  username:           process.env.WAZUH_USERNAME            || "",
+  password:           process.env.WAZUH_PASSWORD            || "",
+  indexer_host:       process.env.WAZUH_HOST                || "",
   indexer_port:       parseInt(process.env.WAZUH_INDEXER_PORT || "9200", 10),
-  indexer_user:       process.env.WAZUH_USERNAME           || "pramod",
-  indexer_pass:       process.env.WAZUH_PASSWORD           || "",
-  rejectUnauthorized: false as boolean,
+  indexer_user:       process.env.WAZUH_INDEXER_USERNAME    || process.env.WAZUH_USERNAME || "",
+  indexer_pass:       process.env.WAZUH_INDEXER_PASSWORD    || process.env.WAZUH_PASSWORD || "",
+  // Secure by default: only disable TLS verification when explicitly opted out
+  // (e.g. self-signed internal Wazuh) via WAZUH_REJECT_UNAUTHORIZED=false.
+  rejectUnauthorized: (process.env.WAZUH_REJECT_UNAUTHORIZED || "true").toLowerCase() !== "false",
 };
+
+// Fail fast with an explicit error when required config is missing, instead of
+// silently hitting a hardcoded internal host with default credentials.
+function assertConfigured(): void {
+  const missing: string[] = [];
+  if (!WAZUH.manager_host) missing.push("WAZUH_HOST");
+  if (!WAZUH.username)     missing.push("WAZUH_USERNAME");
+  if (!WAZUH.password)     missing.push("WAZUH_PASSWORD");
+  if (missing.length > 0) {
+    throw new Error(`Wazuh integration is not configured. Set ${missing.join(", ")}.`);
+  }
+}
 
 // ── JWT cache ─────────────────────────────────────────────────────────────────
 
@@ -72,7 +86,7 @@ function doRequest(
 
 async function getJWT(): Promise<string> {
   if (_jwt && Date.now() < _jwtExp) return _jwt;
-  if (!WAZUH.password) throw new Error("WAZUH_PASSWORD env var is not set");
+  assertConfigured();
 
   const creds = Buffer.from(`${WAZUH.username}:${WAZUH.password}`).toString("base64");
 
@@ -275,6 +289,12 @@ function ok(res: import("express").Response, data: Record<string, unknown>) {
   res.json({ success: true, ...data });
 }
 
+// Error responses must be distinguishable from success: clients should never
+// receive { success: true } alongside an error and then dereference empty data.
+function fail(res: import("express").Response, error: string, status = 502) {
+  res.status(status).json({ success: false, error });
+}
+
 // ── typed helpers for accessing Wazuh API response shape ─────────────────────
 
 function affectedItems(d: unknown): Record<string, unknown>[] {
@@ -303,10 +323,12 @@ router.get("/wazuh/status", async (req, res): Promise<void> => {
 
 router.get("/wazuh/stats", async (req, res): Promise<void> => {
   try {
-    const [agentsRaw, alertsRaw] = await Promise.all([
-      managerGet("/agents?limit=500&sort=-dateAdd").catch(() => null),
-      managerGet("/alerts?limit=500&sort=-timestamp", TTL_SHORT).catch(() => null),
-    ]);
+    // The agents call is the core connectivity/auth probe — let its failure
+    // propagate to the catch below so we return fail() instead of masking a
+    // broken connection as success with zeroed stats. Alerts are best-effort
+    // (a user may lack the events:read scope yet still see agent stats).
+    const agentsRaw = await managerGet("/agents?limit=500&sort=-dateAdd");
+    const alertsRaw = await managerGet("/alerts?limit=500&sort=-timestamp", TTL_SHORT).catch(() => null);
 
     const allAgents = affectedItems(agentsRaw).filter((a) => a.id !== "000");
     const agentStats = { active: 0, disconnected: 0, never_connected: 0, pending: 0, total: allAgents.length };
@@ -335,7 +357,7 @@ router.get("/wazuh/stats", async (req, res): Promise<void> => {
       },
     });
   } catch (e) {
-    ok(res, { data: [], total: 0, error: (e as Error).message });
+    fail(res, (e as Error).message);
   }
 });
 
@@ -347,7 +369,7 @@ router.get("/wazuh/agents", async (req, res): Promise<void> => {
     const items = affectedItems(d).filter((a) => a.id !== "000");
     ok(res, { data: items.map(normAgent), total: items.length });
   } catch (e) {
-    ok(res, { data: [], total: 0, error: (e as Error).message });
+    fail(res, (e as Error).message);
   }
 });
 
@@ -369,7 +391,7 @@ router.get("/wazuh/alerts", async (req, res): Promise<void> => {
     }
     ok(res, { data: affectedItems(d).map(normAlert), total: totalAffectedItems(d) });
   } catch (e) {
-    ok(res, { data: [], total: 0, error: (e as Error).message });
+    fail(res, (e as Error).message);
   }
 });
 
@@ -426,7 +448,7 @@ router.get("/wazuh/threats", async (req, res): Promise<void> => {
 
     ok(res, { data: threats, total: threats.length });
   } catch (e) {
-    ok(res, { data: [], total: 0, error: (e as Error).message });
+    fail(res, (e as Error).message);
   }
 });
 
@@ -459,7 +481,7 @@ router.get("/wazuh/vulnerabilities", async (req, res): Promise<void> => {
 
     ok(res, { data: vulns, total, stats });
   } catch (e) {
-    ok(res, { data: [], total: 0, stats: {}, error: (e as Error).message });
+    fail(res, (e as Error).message);
   }
 });
 
@@ -503,7 +525,7 @@ router.get("/wazuh/mitre", async (req, res): Promise<void> => {
 
     ok(res, { data: result, total: result.length });
   } catch (e) {
-    ok(res, { data: [], total: 0, error: (e as Error).message });
+    fail(res, (e as Error).message);
   }
 });
 
@@ -542,7 +564,7 @@ router.get("/wazuh/sca", async (req, res): Promise<void> => {
 
     ok(res, { data: results, total: results.length });
   } catch (e) {
-    ok(res, { data: [], total: 0, error: (e as Error).message });
+    fail(res, (e as Error).message);
   }
 });
 

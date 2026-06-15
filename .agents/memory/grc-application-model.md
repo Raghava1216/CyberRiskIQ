@@ -6,9 +6,9 @@ description: How the threat-dashboard adopts the user's enterprise GRC shell, an
 # GRC application-model conversion (threat-dashboard)
 
 The threat-dashboard reproduces the user's enterprise GRC "application model": a
-top-tab `Tab.Container` shell with a `LandingPagesTitle` card (title + year filter +
-`Nav variant="underline"` tabs), a `DashboardCards` (#293042) module strip, and a
-`FormReportChartLink` (Forms/Reports/Charts) panel, styled by `reportChart-cards`.
+top-tab shell (year filter + underline tabs) over a KPI module strip and a
+Forms/Reports/Charts link panel. Component/class names live in the code under
+`src/components/platform/` — grep there rather than trusting names listed here.
 
 ## Why only the shell was reproduced (not the real Report/Chart)
 The user's real `Report.jsx` / `Chart.jsx` are backend + platform bound (axios +

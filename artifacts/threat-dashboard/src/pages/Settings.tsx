@@ -2,19 +2,36 @@ import { useState } from 'react';
 import { Shield, Save, RefreshCw, CheckCircle, AlertTriangle, Eye, EyeOff, ExternalLink, Server, Activity, Zap, Database, Lock, Globe, Info } from 'react-feather';
 import { Card, Row, Col, Nav, Form } from 'react-bootstrap';
 
-const PROXY = 'http://localhost:3001';
+const PROXY = '/api';
 const STORAGE_KEY = 'cyberriskiq_wazuh_config';
 
 interface WazuhConfig {
   host: string; port: string; username: string; password: string; enabled: boolean;
 }
 
+const DEFAULT_CONFIG: WazuhConfig = { host: '', port: '55000', username: '', password: '', enabled: false };
+
 function loadConfig(): WazuhConfig {
-  try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); } catch {}
-  return { host: '192.168.1.212', port: '443', username: 'wazuh', password: '', enabled: false };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const stored = JSON.parse(raw);
+      if (stored && typeof stored === 'object') {
+        // Credentials are never read from the browser — drop any legacy secrets.
+        delete stored.username; delete stored.password;
+        return { ...DEFAULT_CONFIG, ...stored };
+      }
+    }
+  } catch {}
+  return { ...DEFAULT_CONFIG };
 }
 
-function saveConfig(cfg: WazuhConfig) { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
+function saveConfig(cfg: WazuhConfig) {
+  // Never persist credentials in the browser; the API server reads them from
+  // environment variables. Only keep non-secret connection preferences.
+  const safe = { host: cfg.host, port: cfg.port, enabled: cfg.enabled };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
+}
 
 interface ConnectionStatus {
   state:    'idle' | 'testing' | 'success' | 'error';
@@ -41,25 +58,18 @@ export default function Settings() {
   const handleSave = () => { saveConfig(config); setSaved(true); setTimeout(() => setSaved(false), 3000); };
 
   const testConnection = async () => {
-    setConn({ state: 'testing', message: 'Running port probe and auth test…' });
+    setConn({ state: 'testing', message: 'Testing connection to the Wazuh API…' });
     try {
-      const diagRes = await fetch(`${PROXY}/wazuh/diagnose`);
-      if (!diagRes.ok) throw new Error(`Proxy not running (HTTP ${diagRes.status}). Start it: node threat-proxy.cjs`);
-      const diagJson = await diagRes.json();
-      const summary  = diagJson.results?.summary || [];
-      const fix      = diagJson.fix || '';
-      const authOk   = diagJson.results?.auth?.success;
-      if (!authOk) {
-        const authErr = summary.find((s: string) => s.includes('credentials') || s.includes('401') || s.includes('cannot reach'));
-        setConn({ state: 'error', message: authErr || fix || summary.join(' | ') || 'Could not authenticate with Wazuh' });
+      const statsRes  = await fetch(`${PROXY}/wazuh/stats`);
+      const statsJson = await statsRes.json().catch(() => ({ success: false, error: `HTTP ${statsRes.status}` }));
+      if (statsJson.success === false || statsJson.error || !statsJson.data) {
+        setConn({ state: 'error', message: statsJson.error || `Could not reach the Wazuh API (HTTP ${statsRes.status})` });
         return;
       }
-      const statsRes  = await fetch(`${PROXY}/wazuh/stats`);
-      const statsJson = await statsRes.json();
-      setConn({ state: 'success', message: fix || 'Connected successfully', manager: statsJson.data?.manager?.hostname || config.host, agents: statsJson.data?.agents?.active || 0, version: statsJson.data?.manager?.version || '' });
+      setConn({ state: 'success', message: 'Connected successfully', manager: statsJson.data?.manager?.hostname || config.host, agents: statsJson.data?.agents?.active || 0, version: statsJson.data?.manager?.version || '' });
     } catch (err) {
       const msg = (err as Error).message;
-      setConn({ state: 'error', message: msg.includes('fetch') || msg.includes('Failed') ? 'Cannot reach proxy. Run: node threat-proxy.cjs in your project directory.' : msg });
+      setConn({ state: 'error', message: msg.includes('fetch') || msg.includes('Failed') ? 'Cannot reach the Wazuh API service.' : msg });
     }
   };
 
@@ -102,9 +112,9 @@ export default function Settings() {
             <div className="d-flex align-items-start gap-3 p-3 rounded" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: '0.78rem', color: '#344054', lineHeight: 1.7 }}>
               <Info size={14} color="#3B82EC" style={{ flexShrink: 0, marginTop: 2 }} />
               <div>
-                <p className="mb-1">CyberRiskIQ connects to Wazuh through the local proxy (<code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4, color: '#3B82EC' }}>threat-proxy.cjs</code>).</p>
-                <p className="mb-1">The proxy handles authentication and HTTPS certificate bypass for internal networks.</p>
-                <p className="mb-0" style={{ color: '#667085' }}>To update credentials: edit <code style={{ background: '#fff', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>WAZUH_CONFIG</code> in <code style={{ background: '#fff', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>threat-proxy.cjs</code>, then restart.</p>
+                <p className="mb-1">CyberRiskIQ connects to Wazuh through the API server, which handles authentication and JWT token caching.</p>
+                <p className="mb-1">Credentials are read from environment variables on the server — they are never stored in the browser.</p>
+                <p className="mb-0" style={{ color: '#667085' }}>To configure: set <code style={{ background: '#fff', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>WAZUH_HOST</code>, <code style={{ background: '#fff', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>WAZUH_USERNAME</code> and <code style={{ background: '#fff', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>WAZUH_PASSWORD</code>, then restart the API server.</p>
               </div>
             </div>
 
@@ -133,7 +143,7 @@ export default function Settings() {
                     <Form.Label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#667085', textTransform: 'uppercase', letterSpacing: '0.04em' }} className="d-flex align-items-center gap-1 mb-1">
                       <Globe size={11} /> Wazuh Host / IP
                     </Form.Label>
-                    <Form.Control value={config.host} onChange={e => set('host', e.target.value)} placeholder="192.168.1.212" style={{ fontSize: '0.82rem', fontFamily: 'monospace' }} />
+                    <Form.Control value={config.host} onChange={e => set('host', e.target.value)} placeholder="wazuh.example.com" style={{ fontSize: '0.82rem', fontFamily: 'monospace' }} />
                   </Col>
                   <Col xs={4}>
                     <Form.Label style={{ fontSize: '0.72rem', fontWeight: 600, color: '#667085', textTransform: 'uppercase', letterSpacing: '0.04em' }} className="mb-1">Port</Form.Label>
@@ -174,7 +184,7 @@ export default function Settings() {
                   <strong style={{ color: '#3B82EC' }}>Wazuh 4.8+:</strong> Vulnerabilities moved from the Manager API to the Wazuh Indexer (OpenSearch at port 9200). The indexer uses separate admin credentials.
                 </div>
                 <div className="p-3 rounded mb-4" style={{ background: '#fffbeb', border: '1px solid #fde68a', fontSize: '0.75rem', color: '#667085' }}>
-                  <strong style={{ color: '#f0ad4e' }}>After any change:</strong> Update <code style={{ background: '#f4f7f9', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>WAZUH</code> in <code style={{ background: '#f4f7f9', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>threat-proxy.cjs</code> and restart: <code style={{ background: '#f4f7f9', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>node threat-proxy.cjs</code>
+                  <strong style={{ color: '#f0ad4e' }}>After any change:</strong> Update the <code style={{ background: '#f4f7f9', padding: '1px 5px', borderRadius: 4, color: '#3B82EC' }}>WAZUH_*</code> environment variables and restart the API server.
                 </div>
 
                 {/* Action buttons */}
@@ -187,9 +197,11 @@ export default function Settings() {
                     {saved ? <CheckCircle size={13} /> : <Save size={13} />}
                     {saved ? 'Saved!' : 'Save Settings'}
                   </button>
-                  <a href="https://192.168.1.212" target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2">
-                    <ExternalLink size={13} /> Open Wazuh
-                  </a>
+                  {config.host && (
+                    <a href={`https://${config.host}`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2">
+                      <ExternalLink size={13} /> Open Wazuh
+                    </a>
+                  )}
                 </div>
               </Card.Body>
             </Card>
@@ -256,10 +268,10 @@ export default function Settings() {
                 <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#101828', marginBottom: 14 }}>Quick Setup Guide</div>
                 <ol className="ps-0 mb-0" style={{ listStyle: 'none' }}>
                   {[
-                    'Open threat-proxy.cjs and find the WAZUH config block near the top',
-                    'Set manager credentials: username / password (used for JWT auth at port 443)',
-                    'Set indexer credentials: indexer_user / indexer_pass (admin at port 9200 — vulnerabilities)',
-                    'Run: node threat-proxy.cjs in a terminal and keep it running',
+                    'Set WAZUH_HOST, WAZUH_USERNAME and WAZUH_PASSWORD on the API server (manager API, JWT auth)',
+                    'Optionally set WAZUH_INDEXER_USERNAME / WAZUH_INDEXER_PASSWORD for the indexer (port 9200 — vulnerabilities)',
+                    'For self-signed internal certificates only, set WAZUH_REJECT_UNAUTHORIZED=false',
+                    'Restart the API server so the new environment variables take effect',
                     'Click "Test Connection" above — it will confirm manager API connectivity',
                     'Navigate to Wazuh SIEM in the sidebar — all three tabs load simultaneously',
                   ].map((text, i) => (
