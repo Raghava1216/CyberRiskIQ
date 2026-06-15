@@ -1,20 +1,36 @@
-import ReportRuntime from "src/components/reports/Report";
-import ThreatForm from "src/components/forms/reactformutils/FormRuntimeEngine";
-import OffCanvasForm from "src/components/pages/OffCanvasNew";
+import React from "react";
+import { Helmet } from "react-helmet-async";
+import { Container, Row } from "react-bootstrap";
+import { useTranslation } from "react-i18next";
 
-const Threats = () => {
+import FormReportChartLink from "src/components/pages/FormReportChartLink";
+import ReportRuntime from "src/components/reports/Report";
+
+const Threats = ({ year, refreshCharts }) => {
+  const { t } = useTranslation("common");
+
+  const forms = [
+    { title: t("Threat"), form: "cyberrisk_threat", privilege: "CR_CREATE_THREAT", upload: true },
+  ];
+
+  const reports = [
+    { title: t("Threats"), report: "CR_RPT_THREATS", privilege: "CR_VIEW_THREAT" },
+  ];
+
+  const combinedItems = [
+    ...forms.map((item) => ({ ...item, type: "form" })),
+    ...reports.map((item) => ({ ...item, type: "report" })),
+  ];
+
   return (
     <>
-      <div className="ms-auto text-end mb-4 me-0">
-        <OffCanvasForm
-          component={
-            <ThreatForm formService="cyberrisk_threat" objectId={-1} offCanvas />
-          }
-          title="Add Threat"
-        />
-      </div>
-
-      <ReportRuntime report="CR_RPT_THREATS" />
+      <Helmet title="CyberRisk IQ — Threats" />
+      <Container fluid className="p-0 m-0">
+        <FormReportChartLink combinedItems={combinedItems} />
+        <Row className="p-0 m-0">
+          <ReportRuntime report="CR_RPT_THREATS" yearProp={year} key={refreshCharts} />
+        </Row>
+      </Container>
     </>
   );
 };
