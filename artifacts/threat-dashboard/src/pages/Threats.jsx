@@ -11,7 +11,6 @@ import {
 import { mockThreats, mockThreatActors } from '../lib/mockData';
 import { iocStore } from '../lib/iocStore';
 import AddIOCModal from '../components/AddIOCModal';
-import type { IOC } from '../lib/types';
 
 const PROXY_URL          = '/api/threat-feeds';
 const LIVE_POLL_INTERVAL = 60_000;
@@ -20,47 +19,26 @@ const CATEGORIES = ['All', 'APT', 'Ransomware', 'Malware', 'Phishing', 'Botnet',
 const STATUSES   = ['All', 'Active', 'Investigating', 'Mitigated', 'Closed'];
 const SOURCES    = ['All', 'Live Feed', 'Manual'];
 
-interface LiveThreat {
-  id:               string;
-  title:            string;
-  category:         string;
-  severity:         'Critical' | 'High' | 'Medium' | 'Low';
-  status:           string;
-  confidence:       number;
-  source:           string;
-  ioc_type:         string;
-  ioc_value:        string;
-  associated_iocs?: string[];
-  first_seen:       string;
-  last_seen:        string;
-  tags:             string[];
-  reporter?:        string;
-  description?:     string;
-  synonyms?:        string[];
-  country?:         string;
-  targets?:         string[];
-}
-
-function severityVariant(s: string): string {
+function severityVariant(s) {
   if (s === 'Critical') return 'danger';
   if (s === 'High')     return 'warning';
   if (s === 'Medium')   return 'warning';
   return 'success';
 }
 
-function severityStyle(s: string): React.CSSProperties {
+function severityStyle(s) {
   if (s === 'High')   return { backgroundColor: '#fd7e14', color: '#fff' };
   if (s === 'Medium') return { backgroundColor: '#f0ad4e', color: '#212529' };
   return {};
 }
 
-function confidenceVariant(v: number): string {
+function confidenceVariant(v) {
   if (v >= 80) return 'success';
   if (v >= 60) return 'warning';
   return 'danger';
 }
 
-function timeAgo(iso: string) {
+function timeAgo(iso) {
   const diff = Date.now() - new Date(iso).getTime();
   const h = Math.floor(diff / 3_600_000);
   if (h < 1)  return 'Just now';
@@ -68,14 +46,14 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function sourceChip(source: string): { label: string; cls: string } {
+function sourceChip(source) {
   if (source.includes('IPsum'))        return { label: 'IPsum',   cls: 'source-chip-ipsum'   };
   if (source.includes('Ransomware'))   return { label: 'MISP RW', cls: 'source-chip-misp-rw' };
   if (source.includes('Threat Actor')) return { label: 'MISP TA', cls: 'source-chip-misp-ta' };
   return                                      { label: 'Feed',    cls: 'source-chip-feed'    };
 }
 
-function iocBadgeCls(type: string): string {
+function iocBadgeCls(type) {
   if (type === 'IP')     return 'ioc-badge ioc-badge-ip';
   if (type === 'Domain') return 'ioc-badge ioc-badge-domain';
   if (type === 'Hash')   return 'ioc-badge ioc-badge-hash';
@@ -83,15 +61,15 @@ function iocBadgeCls(type: string): string {
   return 'ioc-badge ioc-badge-other';
 }
 
-function threatToIOC(threat: LiveThreat): IOC {
-  const typeMap: Record<string, IOC['type']> = {
+function threatToIOC(threat) {
+  const typeMap = {
     IP: 'IP', Domain: 'Domain', URL: 'URL', Hash: 'Hash', Email: 'Email',
     File: 'File', Registry: 'Registry',
   };
   return {
     id:               `ioc-from-${threat.id}-${Date.now()}`,
     value:            threat.ioc_value,
-    type:             (typeMap[threat.ioc_type] ?? 'IP') as IOC['type'],
+    type:             (typeMap[threat.ioc_type] ?? 'IP'),
     severity:         threat.severity,
     status:           'Active',
     confidence:       threat.confidence,
@@ -106,14 +84,7 @@ function threatToIOC(threat: LiveThreat): IOC {
   };
 }
 
-interface ThreatCardProps {
-  threat:     LiveThreat;
-  isLive:     boolean;
-  onAddToIOC: (t: LiveThreat) => void;
-  added:      boolean;
-}
-
-function ThreatCard({ threat, isLive, onAddToIOC, added }: ThreatCardProps) {
+function ThreatCard({ threat, isLive, onAddToIOC, added }) {
   const [expanded, setExpanded] = useState(false);
   const src = sourceChip(threat.source);
   const sev = severityVariant(threat.severity);
@@ -224,29 +195,12 @@ function ThreatCard({ threat, isLive, onAddToIOC, added }: ThreatCardProps) {
   );
 }
 
-interface LiveFeedDrawerProps {
-  show:          boolean;
-  onClose:       () => void;
-  threats:       LiveThreat[];
-  loading:       boolean;
-  fetchError:    string | null;
-  onRefresh:     () => void;
-  lastFetched:   Date | null;
-  countdown:     number;
-  paused:        boolean;
-  onTogglePause: () => void;
-  newCount:      number;
-  onClearNew:    () => void;
-  addedIds:      Set<string>;
-  onAddToIOC:    (t: LiveThreat) => void;
-}
-
 function LiveFeedDrawer({
   show, onClose, threats, loading, fetchError, onRefresh,
   lastFetched, countdown, paused, onTogglePause,
   newCount, onClearNew, addedIds, onAddToIOC,
-}: LiveFeedDrawerProps) {
-  const logRef = useRef<HTMLDivElement>(null);
+}) {
+  const logRef = useRef(null);
   useEffect(() => {
     if (logRef.current && !paused) logRef.current.scrollTop = 0;
   }, [threats.length, paused]);
@@ -314,7 +268,7 @@ function LiveFeedDrawer({
       )}
 
       <div className="d-flex align-items-center gap-3 px-3 py-2 border-bottom" style={{ fontSize: '0.72rem' }}>
-        {(['Critical','High','Medium','Low'] as const).map(s => (
+        {(['Critical','High','Medium','Low']).map(s => (
           <span key={s} className="d-flex align-items-center gap-1">
             <span style={{
               width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
@@ -406,34 +360,34 @@ function LiveFeedDrawer({
 }
 
 export default function Threats() {
-  const [liveThreats,   setLiveThreats]   = useState<LiveThreat[]>([]);
+  const [liveThreats,   setLiveThreats]   = useState([]);
   const [loading,       setLoading]       = useState(false);
-  const [fetchError,    setFetchError]    = useState<string | null>(null);
-  const [lastFetched,   setLastFetched]   = useState<Date | null>(null);
+  const [fetchError,    setFetchError]    = useState(null);
+  const [lastFetched,   setLastFetched]   = useState(null);
   const [livePanelOpen, setLivePanelOpen] = useState(false);
   const [addIOCOpen,    setAddIOCOpen]    = useState(false);
-  const [toast,         setToast]         = useState<string | null>(null);
+  const [toast,         setToast]         = useState(null);
   const [paused,        setPaused]        = useState(false);
   const [newCount,      setNewCount]      = useState(0);
   const [countdown,     setCountdown]     = useState(LIVE_POLL_INTERVAL / 1000);
-  const [addedIds,      setAddedIds]      = useState<Set<string>>(new Set());
+  const [addedIds,      setAddedIds]      = useState(new Set());
 
   const [search,       setSearch]       = useState('');
   const [category,     setCategory]     = useState('All');
   const [status,       setStatus]       = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
-  const [tab,          setTab]          = useState<'feeds' | 'actors'>('feeds');
+  const [tab,          setTab]          = useState('feeds');
 
-  const prevIdsRef = useRef<Set<string>>(new Set());
-  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cdRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevIdsRef = useRef(new Set());
+  const timerRef   = useRef(null);
+  const cdRef      = useRef(null);
 
-  const showToast = (msg: string) => {
+  const showToast = (msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 4000);
   };
 
-  const handleAddToIOC = (threat: LiveThreat) => {
+  const handleAddToIOC = (threat) => {
     if (addedIds.has(threat.id)) return;
     const ioc   = threatToIOC(threat);
     const added = iocStore.add(ioc);
@@ -454,14 +408,14 @@ export default function Threats() {
       if (!res.ok) throw new Error(`Proxy returned HTTP ${res.status}`);
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Unknown proxy error');
-      const threats: LiveThreat[] = json.data ?? [];
+      const threats = json.data ?? [];
       const newOnes = threats.filter(t => !prevIdsRef.current.has(t.id));
       if (newOnes.length > 0 && prevIdsRef.current.size > 0) setNewCount(n => n + newOnes.length);
       threats.forEach(t => prevIdsRef.current.add(t.id));
       setLiveThreats(threats);
       setLastFetched(new Date());
     } catch (err) {
-      setFetchError((err as Error).message);
+      setFetchError(err.message);
     } finally {
       setLoading(false);
     }
@@ -491,7 +445,7 @@ export default function Threats() {
 
   const handleOpenLivePanel = () => { setLivePanelOpen(true); fetchFeeds(true); };
 
-  const handleAddIOCManual = (ioc: IOC) => {
+  const handleAddIOCManual = (ioc) => {
     iocStore.add(ioc);
     setAddIOCOpen(false);
     showToast(`IOC "${ioc.value}" added to register`);
@@ -499,7 +453,7 @@ export default function Threats() {
 
   const allThreats = [
     ...liveThreats,
-    ...mockThreats.map(t => ({ ...t } as unknown as LiveThreat)),
+    ...mockThreats.map(t => ({ ...t })),
   ];
 
   const filtered = allThreats.filter(t => {
@@ -636,7 +590,7 @@ export default function Threats() {
       </Row>
 
       {/* Tabs */}
-      <Nav variant="tabs" className="mb-3" activeKey={tab} onSelect={k => setTab(k as 'feeds' | 'actors')}>
+      <Nav variant="tabs" className="mb-3" activeKey={tab} onSelect={k => setTab(k)}>
         <Nav.Item>
           <Nav.Link eventKey="feeds">
             Threat Feeds {tab === 'feeds' && <Badge bg="primary" pill className="ms-1">{filtered.length}</Badge>}
@@ -698,7 +652,7 @@ export default function Threats() {
                 return (
                   <ThreatCard
                     key={threat.id}
-                    threat={threat as LiveThreat}
+                    threat={threat}
                     isLive={isLive}
                     onAddToIOC={handleAddToIOC}
                     added={addedIds.has(threat.id)}

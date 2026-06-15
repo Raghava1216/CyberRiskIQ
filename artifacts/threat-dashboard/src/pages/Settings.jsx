@@ -5,13 +5,9 @@ import { Card, Row, Col, Nav, Form } from 'react-bootstrap';
 const PROXY = '/api';
 const STORAGE_KEY = 'cyberriskiq_wazuh_config';
 
-interface WazuhConfig {
-  host: string; port: string; username: string; password: string; enabled: boolean;
-}
+const DEFAULT_CONFIG = { host: '', port: '55000', username: '', password: '', enabled: false };
 
-const DEFAULT_CONFIG: WazuhConfig = { host: '', port: '55000', username: '', password: '', enabled: false };
-
-function loadConfig(): WazuhConfig {
+function loadConfig() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -26,19 +22,14 @@ function loadConfig(): WazuhConfig {
   return { ...DEFAULT_CONFIG };
 }
 
-function saveConfig(cfg: WazuhConfig) {
+function saveConfig(cfg) {
   // Never persist credentials in the browser; the API server reads them from
   // environment variables. Only keep non-secret connection preferences.
   const safe = { host: cfg.host, port: cfg.port, enabled: cfg.enabled };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
 }
 
-interface ConnectionStatus {
-  state:    'idle' | 'testing' | 'success' | 'error';
-  message:  string; manager?: string; agents?: number; version?: string;
-}
-
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ on, onChange }) {
   return (
     <div onClick={() => onChange(!on)} style={{ position: 'relative', width: 40, height: 22, borderRadius: 11, background: on ? '#3B82EC' : '#d0d5dd', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
       <div style={{ position: 'absolute', top: 3, left: on ? 20 : 3, width: 16, height: 16, background: '#fff', borderRadius: '50%', boxShadow: '0 1px 3px rgba(0,0,0,.2)', transition: 'left 0.2s' }} />
@@ -47,13 +38,13 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 }
 
 export default function Settings() {
-  const [config,    setConfig]    = useState<WazuhConfig>(loadConfig);
+  const [config,    setConfig]    = useState(loadConfig);
   const [showPass,  setShowPass]  = useState(false);
-  const [conn,      setConn]      = useState<ConnectionStatus>({ state: 'idle', message: '' });
+  const [conn,      setConn]      = useState({ state: 'idle', message: '' });
   const [saved,     setSaved]     = useState(false);
-  const [activeTab, setActiveTab] = useState<'wazuh' | 'general' | 'notifications'>('wazuh');
+  const [activeTab, setActiveTab] = useState('wazuh');
 
-  const set = <K extends keyof WazuhConfig>(key: K, val: WazuhConfig[K]) => setConfig(c => ({ ...c, [key]: val }));
+  const set = (key, val) => setConfig(c => ({ ...c, [key]: val }));
 
   const handleSave = () => { saveConfig(config); setSaved(true); setTimeout(() => setSaved(false), 3000); };
 
@@ -68,7 +59,7 @@ export default function Settings() {
       }
       setConn({ state: 'success', message: 'Connected successfully', manager: statsJson.data?.manager?.hostname || config.host, agents: statsJson.data?.agents?.active || 0, version: statsJson.data?.manager?.version || '' });
     } catch (err) {
-      const msg = (err as Error).message;
+      const msg = err.message;
       setConn({ state: 'error', message: msg.includes('fetch') || msg.includes('Failed') ? 'Cannot reach the Wazuh API service.' : msg });
     }
   };
@@ -77,7 +68,7 @@ export default function Settings() {
     { id: 'wazuh',         label: 'Wazuh SIEM',    icon: Shield    },
     { id: 'general',       label: 'General',        icon: Database  },
     { id: 'notifications', label: 'Notifications',  icon: Activity  },
-  ] as const;
+  ];
 
   return (
     <div className="progrec-page p-4 p-lg-5">

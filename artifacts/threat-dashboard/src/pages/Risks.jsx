@@ -3,20 +3,19 @@ import { Card, Row, Col, Badge, Form, InputGroup, Table, Nav } from 'react-boots
 import { Plus, Download, Search, DollarSign, TrendingUp, Shield, AlertTriangle, X } from 'react-feather';
 import { mockRisks } from '../lib/mockData';
 import RiskMatrix from '../components/RiskMatrix';
-import AddRiskModal, { type NewRisk } from '../components/AddRiskModal';
-import type { Risk } from '../lib/types';
+import AddRiskModal from '../components/AddRiskModal';
 
 const CATEGORIES = ['All', 'Strategic', 'Operational', 'Technical', 'Compliance', 'Financial', 'Reputational'];
 const STATUSES   = ['All', 'Open', 'In Treatment', 'Accepted', 'Closed', 'Transferred'];
 const TREATMENTS = ['All', 'Mitigate', 'Accept', 'Transfer', 'Avoid'];
 const FRAMEWORKS = ['All', 'DORA', 'NIS2', 'NIST CSF', 'ISO 27001', 'GDPR', 'PCI DSS', 'SOC 2'];
 
-const fmt$ = (n: number) =>
+const fmt$ = (n) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M`
   : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K`
   : `$${n}`;
 
-const treatmentBg = (t: string) => {
+const treatmentBg = (t) => {
   if (t === 'Mitigate')  return { bg: '#eff6ff', color: '#3B82EC', border: '#bfdbfe' };
   if (t === 'Accept')    return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
   if (t === 'Transfer')  return { bg: '#f0fdf4', color: '#4BBF73', border: '#bbf7d0' };
@@ -24,7 +23,7 @@ const treatmentBg = (t: string) => {
   return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
 };
 
-const statusBg = (s: string) => {
+const statusBg = (s) => {
   if (s === 'Open')         return { bg: '#fff5f5', color: '#d9534f', border: '#fecaca' };
   if (s === 'In Treatment') return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
   if (s === 'Accepted')     return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
@@ -32,7 +31,7 @@ const statusBg = (s: string) => {
   return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
 };
 
-function InlineBadge({ text, style }: { text: string; style: { bg: string; color: string; border: string } }) {
+function InlineBadge({ text, style }) {
   return (
     <span style={{ display: 'inline-block', fontSize: '0.72rem', padding: '2px 8px', borderRadius: 6, background: style.bg, color: style.color, border: `1px solid ${style.border}`, fontWeight: 500, whiteSpace: 'nowrap' }}>
       {text}
@@ -40,7 +39,7 @@ function InlineBadge({ text, style }: { text: string; style: { bg: string; color
   );
 }
 
-function ScoreBar({ score, max = 25 }: { score: number; max?: number }) {
+function ScoreBar({ score, max = 25 }) {
   const pct = (score / max) * 100;
   const color = score >= 16 ? '#d9534f' : score >= 10 ? '#fd7e14' : score >= 6 ? '#f0ad4e' : '#4BBF73';
   return (
@@ -53,7 +52,7 @@ function ScoreBar({ score, max = 25 }: { score: number; max?: number }) {
   );
 }
 
-function FAIRDetailPanel({ risk, onClose }: { risk: Risk; onClose: () => void }) {
+function FAIRDetailPanel({ risk, onClose }) {
   const tm = treatmentBg(risk.treatment);
   return (
     <>
@@ -145,7 +144,7 @@ function FAIRDetailPanel({ risk, onClose }: { risk: Risk; onClose: () => void })
   );
 }
 
-function exportToCSV(risks: Risk[]) {
+function exportToCSV(risks) {
   const headers = ['ID','Title','Category','Status','Treatment','Inherent Score','Residual Score','ALE','ALE Min','ALE Max','Treatment Cost','ROI %','Framework Tags','Regulatory Ref','Owner','Review Date'];
   const rows = risks.map(r => [r.id, `"${r.title.replace(/"/g,'""')}"`, r.category, r.status, r.treatment, r.inherent_score, r.residual_score, r.fair.ale, r.fair.ale_min, r.fair.ale_max, r.treatment_cost, r.remediation_roi, `"${r.framework_tags.join('; ')}"`, `"${r.regulatory_reference}"`, `"${r.owner}"`, r.review_date]);
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -155,16 +154,16 @@ function exportToCSV(risks: Risk[]) {
 }
 
 export default function Risks() {
-  const [riskData, setRiskData]       = useState<Risk[]>(mockRisks as Risk[]);
+  const [riskData, setRiskData]       = useState(mockRisks);
   const [search, setSearch]           = useState('');
   const [category, setCategory]       = useState('All');
   const [status, setStatus]           = useState('All');
   const [treatment, setTreatment]     = useState('All');
   const [framework, setFramework]     = useState('All');
-  const [view, setView]               = useState<'list' | 'matrix' | 'financial'>('list');
+  const [view, setView]               = useState('list');
   const [modalOpen, setModalOpen]     = useState(false);
-  const [detailRisk, setDetailRisk]   = useState<Risk | null>(null);
-  const [toast, setToast]             = useState<string | null>(null);
+  const [detailRisk, setDetailRisk]   = useState(null);
+  const [toast, setToast]             = useState(null);
 
   const filtered = riskData.filter(r => {
     const q = search.toLowerCase();
@@ -180,10 +179,10 @@ export default function Risks() {
   const avgROI = filtered.filter(r => r.remediation_roi > 0).length > 0
     ? Math.round(filtered.filter(r => r.remediation_roi > 0).reduce((s, r) => s + r.remediation_roi, 0) / filtered.filter(r => r.remediation_roi > 0).length) : 0;
 
-  const handleAddRisk = (newRisk: NewRisk) => {
+  const handleAddRisk = (newRisk) => {
     const score = newRisk.likelihood * newRisk.impact;
     const ale = score * 80_000;
-    const row: Risk = {
+    const row = {
       id: String(riskData.length + 1), title: newRisk.title, category: newRisk.category,
       status: newRisk.status === 'Active' ? 'Open' : 'Accepted',
       likelihood: newRisk.likelihood, impact: newRisk.impact,
@@ -269,7 +268,7 @@ export default function Risks() {
           </Form.Select>
         ))}
         <div className="btn-group">
-          {(['list','financial','matrix'] as const).map(v => (
+          {(['list','financial','matrix']).map(v => (
             <button key={v} onClick={() => setView(v)} className={`btn btn-sm ${view === v ? 'btn-primary' : 'btn-outline-secondary'}`} style={{ fontSize: '0.78rem', textTransform: 'capitalize' }}>{v}</button>
           ))}
         </div>

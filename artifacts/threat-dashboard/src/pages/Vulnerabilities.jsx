@@ -3,15 +3,13 @@ import { Plus, Search, AlertTriangle, Zap, CheckCircle, BookOpen } from 'react-f
 import { Card, Form, InputGroup, Table } from 'react-bootstrap';
 import { mockVulnerabilities } from '../lib/mockData';
 import SeverityBadge from '../components/SeverityBadge';
-import ImportScanModal, { type ParsedVuln } from '../components/ImportScanModal';
-import BrowseCVEModal, { type CVEEntry } from '../components/BrowseCVEModal';
+import ImportScanModal from '../components/ImportScanModal';
+import BrowseCVEModal from '../components/BrowseCVEModal';
 
 const SEVERITIES = ['All', 'Critical', 'High', 'Medium', 'Low'];
 const STATUSES   = ['All', 'Open', 'In Progress', 'Remediated', 'Accepted', 'False Positive'];
 
-type VulnRow = (typeof mockVulnerabilities)[number] | ParsedVuln;
-
-function CVSSBar({ score }: { score: number }) {
+function CVSSBar({ score }) {
   const color = score >= 9 ? '#d9534f' : score >= 7 ? '#fd7e14' : score >= 4 ? '#f0ad4e' : '#4BBF73';
   return (
     <div className="d-flex align-items-center gap-2">
@@ -24,22 +22,22 @@ function CVSSBar({ score }: { score: number }) {
 }
 
 export default function Vulnerabilities() {
-  const [vulns,      setVulns]      = useState<VulnRow[]>(mockVulnerabilities);
+  const [vulns,      setVulns]      = useState(mockVulnerabilities);
   const [search,     setSearch]     = useState('');
   const [severity,   setSeverity]   = useState('All');
   const [status,     setStatus]     = useState('All');
   const [importOpen, setImportOpen] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
-  const [toast,      setToast]      = useState<{ msg: string; ok: boolean } | null>(null);
+  const [toast,      setToast]      = useState(null);
 
-  const showToast = (msg: string, ok = true) => {
+  const showToast = (msg, ok = true) => {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 5000);
   };
 
   const existingCVEIds = new Set(vulns.map(v => v.cve_id));
 
-  const handleScanImport = (newVulns: ParsedVuln[]) => {
+  const handleScanImport = (newVulns) => {
     const newOnes = newVulns.filter(v => !existingCVEIds.has(v.cve_id));
     setVulns(prev => [...newOnes, ...prev]);
     showToast(
@@ -49,12 +47,12 @@ export default function Vulnerabilities() {
     );
   };
 
-  const handleCVEImport = (cves: CVEEntry[]) => {
+  const handleCVEImport = (cves) => {
     const newOnes = cves.filter(c => !existingCVEIds.has(c.cve_id));
     if (newOnes.length === 0) { showToast('All selected CVEs already exist', false); return; }
-    const converted: ParsedVuln[] = newOnes.map(c => ({
+    const converted = newOnes.map(c => ({
       id: `cve-lib-${c.cve_id}-${Date.now()}`, cve_id: c.cve_id, title: c.title,
-      cvss_score: c.cvss_score, severity: c.severity as ParsedVuln['severity'],
+      cvss_score: c.cvss_score, severity: c.severity,
       status: 'Open', asset: c.asset, patch_available: c.patch_available,
       exploit_available: c.exploit_available, published_date: c.published_date,
       due_date: c.due_date, assigned_to: 'Unassigned',

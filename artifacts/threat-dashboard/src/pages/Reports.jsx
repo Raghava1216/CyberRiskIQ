@@ -7,7 +7,7 @@ import {
 } from '../lib/mockData';
 import { pdfGenerators } from '../lib/pdfExport';
 
-const fmt$ = (n: number) =>
+const fmt$ = (n) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M`
   : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K`
   : `$${n}`;
@@ -15,15 +15,7 @@ const fmt$ = (n: number) =>
 const TODAY     = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
-type ReportId = 'exec' | 'fair' | 'risk' | 'compliance' | 'vuln' | 'incident' | 'dora' | 'board';
-
-interface Template {
-  id: ReportId; title: string; description: string;
-  icon: React.ComponentType<{ size?: number; color?: string }>;
-  category: string; lastGenerated: string; frequency: string; sections: string[];
-}
-
-const reportTemplates: Template[] = [
+const reportTemplates = [
   { id: 'exec',       title: 'Executive Risk Summary',       icon: TrendingUp,    category: 'Executive',   lastGenerated: '2026-05-10', frequency: 'Monthly',   description: 'High-level KPIs, risk trend, compliance posture, and board-level metrics.',                           sections: ['Risk Overview','Financial Exposure','Compliance Summary','Top Risks','Incident Summary'] },
   { id: 'fair',       title: 'FAIR Financial Risk Report',   icon: DollarSign,    category: 'Financial',   lastGenerated: '2026-05-12', frequency: 'Monthly',   description: 'ALE analysis, Monte Carlo VaR distribution, remediation ROI and treatment investment.',              sections: ['Aggregate ALE','VaR Percentiles','Per-Risk FAIR Analysis','Remediation ROI','Treatment Budget'] },
   { id: 'board',      title: 'Board & Executive Deck',       icon: Users,         category: 'Executive',   lastGenerated: '2026-05-01', frequency: 'Quarterly', description: 'One-page board summary: VaR, DORA/NIS2 status, top financial risks, and mitigation spend.',            sections: ['VaR & ALE Summary','DORA Compliance','NIS2 Readiness','Investment vs Risk Reduction'] },
@@ -34,7 +26,7 @@ const reportTemplates: Template[] = [
   { id: 'incident',   title: 'Incident Response Summary',    icon: Calendar,      category: 'Operations',  lastGenerated: '2026-05-12', frequency: 'Weekly',    description: 'MTTR, MTTD, financial impact per incident, DORA reportability, and lessons learned.',                sections: ['Incident Overview','Financial Impact','DORA Reportable Events','MTTR / MTTD'] },
 ];
 
-const categoryStyle = (cat: string) => {
+const categoryStyle = (cat) => {
   if (cat === 'Executive')  return { bg: '#eff6ff', color: '#3B82EC', border: '#bfdbfe' };
   if (cat === 'Financial')  return { bg: '#f0fdf4', color: '#4BBF73', border: '#bbf7d0' };
   if (cat === 'Risk')       return { bg: '#fff5f5', color: '#d9534f', border: '#fecaca' };
@@ -45,8 +37,8 @@ const categoryStyle = (cat: string) => {
 };
 
 export default function Reports() {
-  const [generating, setGenerating] = useState<ReportId | null>(null);
-  const [toast,      setToast]      = useState<string | null>(null);
+  const [generating, setGenerating] = useState(null);
+  const [toast,      setToast]      = useState(null);
 
   const openRisks      = mockRisks.filter(r => r.status === 'Open').length;
   const criticalRisks  = mockRisks.filter(r => r.inherent_score >= 16).length;
@@ -60,7 +52,7 @@ export default function Reports() {
   const doraIncidents  = mockIncidents.filter(i => i.is_dora_reportable);
   const doraReported   = doraIncidents.filter(i => i.dora_reported).length;
 
-  const handleGenerate = async (id: ReportId, title: string) => {
+  const handleGenerate = async (id, title) => {
     setGenerating(id);
     await new Promise(r => setTimeout(r, 800));
     pdfGenerators[id]?.();
@@ -109,7 +101,7 @@ export default function Reports() {
               { l: 'DORA Ready',   v: `${mockRegulatoryMetrics.dora.readiness}%`, c: '#f0ad4e' },
               { l: 'NIS2 Ready',   v: `${mockRegulatoryMetrics.nis2.readiness}%`, c: '#f0ad4e' },
             ].map(s => (
-              <Col key={s.l} xs={6} sm={3} xl={Math.floor(12/8) as any}>
+              <Col key={s.l} xs={6} sm={3} xl={Math.floor(12/8)}>
                 <div className="text-center p-2 rounded" style={{ background: '#f9fafb', border: '1px solid #e4e7ec' }}>
                   <div style={{ fontWeight: 700, fontSize: '1.1rem', color: s.c, fontVariantNumeric: 'tabular-nums' }}>{s.v}</div>
                   <div style={{ fontSize: '0.68rem', color: '#98a2b3' }}>{s.l}</div>

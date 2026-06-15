@@ -4,13 +4,12 @@ import { Card, Row, Col, Form, InputGroup, Badge } from 'react-bootstrap';
 import { mockIncidents } from '../lib/mockData';
 import SeverityBadge from '../components/SeverityBadge';
 import DeclareIncidentModal from '../components/DeclareIncidentModal';
-import type { Incident } from '../lib/types';
 
 const TYPES      = ['All','Security Breach','Data Leak','Ransomware','DDoS','Phishing','Insider Threat','Malware','Unauthorized Access','System Outage','Supply Chain Attack','Social Engineering','Physical Security'];
 const STATUSES   = ['All','Open','Investigating','Contained','Resolved','Closed'];
 const PRIORITIES = ['All','P1','P2','P3','P4'];
 
-function timeAgo(iso: string) {
+function timeAgo(iso) {
   const diff = Date.now() - new Date(iso).getTime();
   const h = Math.floor(diff / 3600000);
   if (h < 1)  return 'Just now';
@@ -18,7 +17,7 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function duration(start: string, end?: string) {
+function duration(start, end) {
   const ms = (end ? new Date(end) : new Date()).getTime() - new Date(start).getTime();
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
@@ -26,7 +25,7 @@ function duration(start: string, end?: string) {
   return `${m}m`;
 }
 
-const prioStyle = (p: string) => {
+const prioStyle = (p) => {
   if (p === 'P1') return { bg: '#fff5f5', color: '#d9534f', border: '#fecaca' };
   if (p === 'P2') return { bg: '#fff7ed', color: '#fd7e14', border: '#fed7aa' };
   if (p === 'P3') return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
@@ -34,17 +33,17 @@ const prioStyle = (p: string) => {
 };
 
 export default function Incidents() {
-  const [incidents, setIncidents] = useState<Incident[]>(mockIncidents as Incident[]);
+  const [incidents, setIncidents] = useState(mockIncidents);
   const [search,    setSearch]    = useState('');
   const [type,      setType]      = useState('All');
   const [status,    setStatus]    = useState('All');
   const [priority,  setPriority]  = useState('All');
   const [modalOpen, setModalOpen] = useState(false);
-  const [toast,     setToast]     = useState<{ msg: string; id: string } | null>(null);
+  const [toast,     setToast]     = useState(null);
 
-  const showToast = (msg: string, id: string) => { setToast({ msg, id }); setTimeout(() => setToast(null), 5000); };
+  const showToast = (msg, id) => { setToast({ msg, id }); setTimeout(() => setToast(null), 5000); };
 
-  const handleDeclare = (incident: Incident) => {
+  const handleDeclare = (incident) => {
     setIncidents(prev => [incident, ...prev]);
     setModalOpen(false);
     showToast(`Incident "${incident.title}" declared as ${incident.id}`, incident.id);

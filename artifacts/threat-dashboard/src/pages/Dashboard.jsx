@@ -5,16 +5,13 @@ import {
   mockOrg, mockKPIs, mockRisks, mockIncidents, mockComplianceFrameworks,
   mockRiskTrend, mockRegulatoryMetrics, mockMonteCarloResults, mockTreatmentMix,
 } from '../lib/mockData';
-import type { NavPage } from '../lib/types';
 
-interface DashboardProps { onNavigate: (p: NavPage) => void }
-
-const fmt$ = (n: number) =>
+const fmt$ = (n) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M`
   : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K`
   : `$${n}`;
 
-function ScoreGauge({ score }: { score: number }) {
+function ScoreGauge({ score }) {
   const r = 54; const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ * 0.75;
   const color = score <= 40 ? '#4BBF73' : score <= 65 ? '#f0ad4e' : '#d9534f';
@@ -34,13 +31,11 @@ function ScoreGauge({ score }: { score: number }) {
 
 const BAR_AREA_H = 96; // px — bar column height
 
-function MiniBar({ month, critical, high, medium, low, maxVal }: {
-  month: string; critical: number; high: number; medium: number; low: number; maxVal: number;
-}) {
+function MiniBar({ month, critical, high, medium, low, maxVal }) {
   const total   = critical + high + medium + low;
   // Scale total column height proportionally; each segment carved from that height
   const colH    = maxVal > 0 ? (total / maxVal) * BAR_AREA_H : 0;
-  const segH    = (v: number) => total > 0 ? Math.max(2, (v / total) * colH) : 0;
+  const segH    = (v) => total > 0 ? Math.max(2, (v / total) * colH) : 0;
 
   const segs = [
     { v: low,      c: '#3B82EC99', label: 'low'      },
@@ -129,7 +124,7 @@ function TreatmentDonut() {
   );
 }
 
-function ReadinessBar({ label, score, color }: { label: string; score: number; color: string }) {
+function ReadinessBar({ label, score, color }) {
   return (
     <div className="d-flex align-items-center gap-2">
       <span style={{ fontSize: '0.75rem', color: '#667085', width: 160, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
@@ -141,8 +136,8 @@ function ReadinessBar({ label, score, color }: { label: string; score: number; c
   );
 }
 
-export default function Dashboard({ onNavigate }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'financial' | 'regulatory'>('financial');
+export default function Dashboard({ onNavigate }) {
+  const [activeTab, setActiveTab] = useState('financial');
   const maxTrend = Math.max(...mockRiskTrend.map(m => m.critical + m.high + m.medium + m.low));
 
   const totalALE = mockRisks.reduce((s, r) => s + r.fair.ale, 0);
@@ -156,12 +151,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const top5Risks = [...mockRisks].sort((a, b) => b.fair.ale - a.fair.ale).slice(0, 5);
 
   const kpis = [
-    { label: 'Aggregate ALE',      value: fmt$(totalALE),                     sub: 'Annualised Loss Exp.', icon: DollarSign, accent: '#d9534f', nav: 'risks' as NavPage },
-    { label: 'VaR 95th Pct',       value: fmt$(mockKPIs.valueAtRisk_95),       sub: 'Monte Carlo',         icon: TrendingUp, accent: '#fd7e14', nav: 'risks' as NavPage },
-    { label: 'Treatment Budget',   value: fmt$(totalTreatmentBudget),          sub: 'Total invested',      icon: Shield,     accent: '#3B82EC', nav: 'risks' as NavPage },
-    { label: 'DORA Incidents',     value: String(doraIncidents.length),        sub: `${doraReported} reported`, icon: AlertTriangle, accent: '#f0ad4e', nav: 'incidents' as NavPage },
-    { label: 'NIS2 Readiness',     value: `${mockKPIs.nis2ReadinessScore}%`,   sub: 'Compliance posture',  icon: CheckCircle, accent: '#4BBF73', nav: 'compliance' as NavPage },
-    { label: 'Avg Remediation ROI', value: `${Math.round(avgROI)}%`,           sub: 'Risk reduction return', icon: BarChart2, accent: '#6f42c1', nav: 'risks' as NavPage },
+    { label: 'Aggregate ALE',      value: fmt$(totalALE),                     sub: 'Annualised Loss Exp.', icon: DollarSign, accent: '#d9534f', nav: 'risks' },
+    { label: 'VaR 95th Pct',       value: fmt$(mockKPIs.valueAtRisk_95),       sub: 'Monte Carlo',         icon: TrendingUp, accent: '#fd7e14', nav: 'risks' },
+    { label: 'Treatment Budget',   value: fmt$(totalTreatmentBudget),          sub: 'Total invested',      icon: Shield,     accent: '#3B82EC', nav: 'risks' },
+    { label: 'DORA Incidents',     value: String(doraIncidents.length),        sub: `${doraReported} reported`, icon: AlertTriangle, accent: '#f0ad4e', nav: 'incidents' },
+    { label: 'NIS2 Readiness',     value: `${mockKPIs.nis2ReadinessScore}%`,   sub: 'Compliance posture',  icon: CheckCircle, accent: '#4BBF73', nav: 'compliance' },
+    { label: 'Avg Remediation ROI', value: `${Math.round(avgROI)}%`,           sub: 'Risk reduction return', icon: BarChart2, accent: '#6f42c1', nav: 'risks' },
   ];
 
   return (
@@ -281,7 +276,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           <Card className="shadow-sm border-0 h-100" style={{ borderRadius: 10, overflow: 'hidden' }}>
             <div style={{ borderBottom: '1px solid #e4e7ec' }}>
               <Nav variant="tabs" className="border-0 px-2 pt-2">
-                {(['financial', 'regulatory'] as const).map(tab => (
+                {(['financial', 'regulatory']).map(tab => (
                   <Nav.Item key={tab}>
                     <Nav.Link active={activeTab === tab} onClick={() => setActiveTab(tab)}
                       style={{ fontSize: '0.82rem', fontFamily: 'Poppins,sans-serif', cursor: 'pointer', color: activeTab === tab ? '#3B82EC' : '#667085' }}>

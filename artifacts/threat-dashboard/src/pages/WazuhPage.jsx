@@ -4,35 +4,7 @@ import { Card, Nav } from 'react-bootstrap';
 
 const PROXY = '/api';
 
-interface WazuhStats {
-  manager: { version: string; hostname: string; type: string };
-  agents:  { active: number; disconnected: number; never_connected: number; pending: number; total: number };
-  alerts:  { critical: number; high: number; medium: number; low: number; total: number };
-}
-interface Agent {
-  id: string; name: string; ip: string; os: string; os_name: string;
-  arch: string; status: string; wazuh_status: string; version: string;
-  last_seen: string; groups: string[]; node: string;
-}
-interface Alert {
-  id: string; rule_id: string; rule_desc: string; rule_level: number;
-  rule_groups: string[]; severity: string; agent_id: string; agent_name: string;
-  agent_ip: string; timestamp: string; location: string; decoder: string;
-  mitre_id: string; mitre_tactic: string; mitre_tech: string; full_log: string;
-}
-interface Threat {
-  id: string; title: string; category: string; severity: string;
-  confidence: number; source: string; ioc_value: string;
-  first_seen: string; count: number; rule_id: string;
-  mitre_id: string; mitre_tactic: string; mitre_tech: string;
-  agents: string[]; tags: string[]; description: string;
-}
-interface MitreTech {
-  id: string; tactic: string; technique: string;
-  count: number; agents: string[]; severity: string;
-}
-
-function timeAgo(iso: string) {
+function timeAgo(iso) {
   if (!iso) return '—';
   const ms = Date.now() - new Date(iso).getTime();
   const m  = Math.floor(ms / 60_000);
@@ -43,25 +15,25 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-const sevStyle = (s: string) => {
+const sevStyle = (s) => {
   if (s === 'Critical') return { color: '#d9534f', bg: '#fff5f5', border: '#fecaca' };
   if (s === 'High')     return { color: '#fd7e14', bg: '#fff7ed', border: '#fed7aa' };
   if (s === 'Medium')   return { color: '#f0ad4e', bg: '#fffbeb', border: '#fde68a' };
   return                       { color: '#4BBF73', bg: '#f0fdf4', border: '#bbf7d0' };
 };
 
-function SevChip({ s, small }: { s: string; small?: boolean }) {
+function SevChip({ s, small }) {
   const st = sevStyle(s);
   return (
     <span style={{ display: 'inline-block', fontSize: small ? '0.65rem' : '0.72rem', padding: '2px 7px', borderRadius: 6, background: st.bg, color: st.color, border: `1px solid ${st.border}`, fontWeight: 500 }}>{s}</span>
   );
 }
 
-function useWazuh<T>(endpoint: string, enabled = true) {
-  const [data,    setData]    = useState<T | null>(null);
+function useWazuh(endpoint, enabled = true) {
+  const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
-  const [ts,      setTs]      = useState<Date | null>(null);
+  const [error,   setError]   = useState(null);
+  const [ts,      setTs]      = useState(null);
 
   const fetch_ = useCallback(async () => {
     if (!enabled) return;
@@ -73,12 +45,12 @@ function useWazuh<T>(endpoint: string, enabled = true) {
         setData(null);
         setError(j.error || `Request failed (HTTP ${r.status})`);
       } else {
-        setData((j.data ?? j) as T);
+        setData(j.data ?? j);
         setTs(new Date());
       }
     } catch (e) {
       setData(null);
-      setError((e as Error).message.includes('fetch') ? 'Cannot reach the Wazuh API service.' : (e as Error).message);
+      setError(e.message.includes('fetch') ? 'Cannot reach the Wazuh API service.' : e.message);
     } finally {
       setLoading(false);
     }
@@ -90,10 +62,6 @@ function useWazuh<T>(endpoint: string, enabled = true) {
 
 function SectionCard({
   title, icon: Icon, iconBg, badge, loading, error, refetch, ts, children, action,
-}: {
-  title: string; icon: React.ElementType; iconBg: string; badge?: number | string;
-  loading?: boolean; error?: string | null; refetch?: () => void; ts?: Date | null;
-  children: React.ReactNode; action?: React.ReactNode;
 }) {
   return (
     <Card className="shadow-sm border-0 h-100" style={{ borderRadius: 10, overflow: 'hidden' }}>
@@ -141,8 +109,8 @@ function SectionCard({
   );
 }
 
-function iconBgStyle(spec: string): React.CSSProperties {
-  const map: Record<string, React.CSSProperties> = {
+function iconBgStyle(spec) {
+  const map = {
     purple: { background: '#f5f3ff', color: '#6f42c1' },
     red:    { background: '#fff5f5', color: '#d9534f' },
     blue:   { background: '#eff6ff', color: '#3B82EC' },
@@ -153,30 +121,30 @@ function iconBgStyle(spec: string): React.CSSProperties {
 }
 
 export default function WazuhPage() {
-  const [activeTab,   setActiveTab]   = useState<'threats' | 'secops' | 'servers'>('threats');
+  const [activeTab,   setActiveTab]   = useState('threats');
   const [alertFilter, setAlertFilter] = useState('All');
   const [agentFilter, setAgentFilter] = useState('All');
 
-  const stats   = useWazuh<WazuhStats>('/wazuh/stats');
-  const threats = useWazuh<Threat[]>    ('/wazuh/threats',                       activeTab === 'threats');
-  const mitre   = useWazuh<MitreTech[]> ('/wazuh/mitre',                         activeTab === 'threats');
-  const alerts  = useWazuh<Alert[]>     ('/wazuh/alerts?limit=200&minLevel=3',    activeTab === 'secops');
-  const agents  = useWazuh<Agent[]>     ('/wazuh/agents',                        activeTab === 'servers');
-  const sca     = useWazuh<any[]>       ('/wazuh/sca',                           activeTab === 'servers');
+  const stats   = useWazuh('/wazuh/stats');
+  const threats = useWazuh('/wazuh/threats',                       activeTab === 'threats');
+  const mitre   = useWazuh('/wazuh/mitre',                         activeTab === 'threats');
+  const alerts  = useWazuh('/wazuh/alerts?limit=200&minLevel=3',    activeTab === 'secops');
+  const agents  = useWazuh('/wazuh/agents',                        activeTab === 'servers');
+  const sca     = useWazuh('/wazuh/sca',                           activeTab === 'servers');
 
   const connected = stats.data !== null;
   const offline   = stats.error !== null;
 
   const filteredAlerts = (alerts.data || []).filter(a => alertFilter === 'All' || a.severity === alertFilter);
-  const alertBySev     = (alerts.data || []).reduce((acc, a) => { acc[a.severity] = (acc[a.severity] || 0) + 1; return acc; }, {} as Record<string, number>);
+  const alertBySev     = (alerts.data || []).reduce((acc, a) => { acc[a.severity] = (acc[a.severity] || 0) + 1; return acc; }, {});
   const filteredAgents = (agents.data || []).filter(a => agentFilter === 'All' || a.wazuh_status === agentFilter);
-  const osCounts       = (agents.data || []).reduce((acc, a) => { const k = a.os.split(' ')[0] || 'Unknown'; acc[k] = (acc[k] || 0) + 1; return acc; }, {} as Record<string, number>);
+  const osCounts       = (agents.data || []).reduce((acc, a) => { const k = a.os.split(' ')[0] || 'Unknown'; acc[k] = (acc[k] || 0) + 1; return acc; }, {});
 
   const TABS = [
     { id: 'threats', label: 'Threat Intelligence', icon: Target,   count: threats.data?.length },
     { id: 'secops',  label: 'Security Operations', icon: Activity, count: alerts.data?.length  },
     { id: 'servers', label: 'Server Management',   icon: Server,   count: agents.data?.length  },
-  ] as const;
+  ];
 
   return (
     <div className="progrec-page p-4 p-lg-5">
@@ -297,7 +265,7 @@ export default function WazuhPage() {
                 <div className="p-4 d-flex flex-column gap-3">
                   {mitre.data.slice(0, 20).map(m => {
                     const st = sevStyle(m.severity);
-                    const pct = Math.min(100, (m.count / (mitre.data![0]?.count || 1)) * 100);
+                    const pct = Math.min(100, (m.count / (mitre.data[0]?.count || 1)) * 100);
                     return (
                       <div key={m.id}>
                         <div className="d-flex align-items-center gap-3">

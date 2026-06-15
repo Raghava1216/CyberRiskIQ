@@ -8,8 +8,7 @@ import {
   CheckCircle, AlertTriangle, Shield, Tag, DollarSign,
 } from 'react-feather';
 import { mockAssets } from '../lib/mockData';
-import type { Asset } from '../lib/types';
-import AddAssetModal, { type NewAsset } from '../components/AddAssetModal';
+import AddAssetModal from '../components/AddAssetModal';
 import ImportAssetCSVModal from '../components/ImportAssetCSVModal';
 
 const CATEGORIES    = ['All', 'IT', 'OT', 'Cloud', 'Mobile'];
@@ -17,65 +16,65 @@ const CRITICALITIES = ['All', 'Critical', 'High', 'Medium', 'Low'];
 const CLASSES       = ['All', 'Primary', 'Supporting', 'External'];
 const REG_SCOPE     = ['All', 'DORA', 'NIS2', 'GDPR', 'PCI DSS', 'SOC 2', 'ISO 27001', 'MiFID II'];
 
-const typeIcon = (type: string) => {
+const typeIcon = (type) => {
   if (type === 'Cloud' || type === 'Application' || type === 'Cloud Service') return Cloud;
   if (type === 'IoT') return Cpu;
   if (type === 'Workstation') return Monitor;
   return Server;
 };
 
-function critVariant(c: string): string {
+function critVariant(c) {
   if (c === 'Critical') return 'danger';
   if (c === 'High')     return 'warning';
   if (c === 'Medium')   return 'warning';
   return 'success';
 }
 
-function critStyle(c: string): React.CSSProperties {
+function critStyle(c) {
   if (c === 'High')   return { backgroundColor: '#fd7e14', color: '#fff' };
   if (c === 'Medium') return { backgroundColor: '#f0ad4e', color: '#212529' };
   return {};
 }
 
-function critIconStyle(c: string): React.CSSProperties {
+function critIconStyle(c) {
   if (c === 'Critical') return { background: 'rgba(217,83,79,0.12)',  color: '#d9534f'  };
   if (c === 'High')     return { background: 'rgba(253,126,20,0.12)', color: '#fd7e14'  };
   if (c === 'Medium')   return { background: 'rgba(240,173,78,0.12)', color: '#b07d20'  };
   return { background: '#f4f7f9', color: '#6c757d' };
 }
 
-function dataClassBadge(d: string) {
+function dataClassBadge(d) {
   if (d === 'Restricted')   return { bg: 'danger',   label: d };
   if (d === 'Confidential') return { bg: 'warning',  label: d };
   if (d === 'Internal')     return { bg: 'secondary', label: d };
   return { bg: 'light', label: d };
 }
 
-function assetClassStyle(c: string): React.CSSProperties {
+function assetClassStyle(c) {
   if (c === 'Primary')    return { background: 'rgba(59,130,236,0.1)', color: '#3B82EC', border: '1px solid rgba(59,130,236,0.3)', fontSize: '0.7rem' };
   if (c === 'Supporting') return { background: 'rgba(31,155,207,0.1)', color: '#1F9BCF', border: '1px solid rgba(31,155,207,0.3)', fontSize: '0.7rem' };
   return { background: '#f4f7f9', color: '#6c757d', border: '1px solid #dee2e6', fontSize: '0.7rem' };
 }
 
-function riskVariant(score: number): string {
+function riskVariant(score) {
   if (score >= 80) return 'danger';
   if (score >= 60) return 'warning';
   if (score >= 40) return 'warning';
   return 'success';
 }
 
-function riskStyle(score: number): React.CSSProperties {
+function riskStyle(score) {
   if (score >= 60 && score < 80) return { backgroundColor: '#fd7e14' };
   if (score >= 40 && score < 60) return { backgroundColor: '#f0ad4e' };
   return {};
 }
 
-const fmt$ = (n: number) =>
+const fmt$ = (n) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(0)}M`
   : n >= 1_000 ? `$${(n / 1_000).toFixed(0)}K`
   : `$${n}`;
 
-function timeAgo(iso: string) {
+function timeAgo(iso) {
   if (!iso) return 'Never';
   const diff = Date.now() - new Date(iso).getTime();
   const h = Math.floor(diff / 3600000);
@@ -85,22 +84,22 @@ function timeAgo(iso: string) {
 }
 
 export default function Assets() {
-  const [assets, setAssets]           = useState<Asset[]>(mockAssets as Asset[]);
+  const [assets, setAssets]           = useState(mockAssets);
   const [search, setSearch]           = useState('');
   const [category, setCategory]       = useState('All');
   const [criticality, setCriticality] = useState('All');
   const [assetClass, setAssetClass]   = useState('All');
   const [regScope, setRegScope]       = useState('All');
-  const [view, setView]               = useState<'grid' | 'table'>('grid');
+  const [view, setView]               = useState('grid');
   const [addOpen, setAddOpen]         = useState(false);
   const [importOpen, setImportOpen]   = useState(false);
-  const [toast, setToast]             = useState<string | null>(null);
+  const [toast, setToast]             = useState(null);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 5000); };
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 5000); };
 
-  const handleAddAsset = (asset: NewAsset) => {
-    const full: Asset = {
-      ...(asset as unknown as Asset),
+  const handleAddAsset = (asset) => {
+    const full = {
+      ...asset,
       asset_class: 'Supporting',
       open_cve_count: 0,
       regulatory_scope: [],
@@ -113,13 +112,13 @@ export default function Assets() {
     showToast(`Asset "${asset.name}" added`);
   };
 
-  const handleImportAssets = (newAssets: NewAsset[]) => {
-    const fullAssets: Asset[] = newAssets.map(a => ({
-      ...(a as unknown as Asset),
-      asset_class: 'Supporting' as const,
+  const handleImportAssets = (newAssets) => {
+    const fullAssets = newAssets.map(a => ({
+      ...a,
+      asset_class: 'Supporting',
       open_cve_count: 0,
       regulatory_scope: [],
-      data_classification: 'Internal' as const,
+      data_classification: 'Internal',
       business_function: '',
       annual_value: 0,
     }));
@@ -132,8 +131,8 @@ export default function Assets() {
     const matchSearch = a.name.toLowerCase().includes(q) || a.owner.toLowerCase().includes(q) || a.ip_address.includes(q);
     const matchCat    = category === 'All'    || a.category === category;
     const matchCrit   = criticality === 'All' || a.criticality === criticality;
-    const matchClass  = assetClass === 'All'  || (a as Asset).asset_class === assetClass;
-    const matchReg    = regScope === 'All'    || ((a as Asset).regulatory_scope ?? []).includes(regScope);
+    const matchClass  = assetClass === 'All'  || a.asset_class === assetClass;
+    const matchReg    = regScope === 'All'    || (a.regulatory_scope ?? []).includes(regScope);
     return matchSearch && matchCat && matchCrit && matchClass && matchReg;
   });
 
@@ -141,8 +140,8 @@ export default function Assets() {
     total:      assets.length,
     critical:   assets.filter(a => a.criticality === 'Critical').length,
     highRisk:   assets.filter(a => a.risk_score >= 70).length,
-    openCVEs:   assets.reduce((s, a) => s + ((a as Asset).open_cve_count ?? 0), 0),
-    totalValue: assets.reduce((s, a) => s + ((a as Asset).annual_value ?? 0), 0),
+    openCVEs:   assets.reduce((s, a) => s + (a.open_cve_count ?? 0), 0),
+    totalValue: assets.reduce((s, a) => s + (a.annual_value ?? 0), 0),
   };
 
   return (
@@ -246,7 +245,7 @@ export default function Assets() {
       {view === 'grid' && (
         <Row className="g-3">
           {filtered.map(asset => {
-            const a    = asset as Asset;
+            const a    = asset;
             const Icon = typeIcon(asset.type);
             const dc   = dataClassBadge(a.data_classification ?? '');
             return (
@@ -299,7 +298,7 @@ export default function Assets() {
                         <Badge bg="warning" className="fw-normal" style={{ color: '#212529' }}>{asset.vulnerability_count} vulns</Badge>
                       )}
                       {a.data_classification && (
-                        <Badge bg={dc.bg as any} className="fw-normal"
+                        <Badge bg={dc.bg} className="fw-normal"
                           style={dc.bg === 'light' ? { color: '#6c757d', border: '1px solid #dee2e6' } : {}}>
                           {dc.label}
                         </Badge>
@@ -357,7 +356,7 @@ export default function Assets() {
               </thead>
               <tbody>
                 {filtered.map(asset => {
-                  const a  = asset as Asset;
+                  const a  = asset;
                   const dc = dataClassBadge(a.data_classification ?? '');
                   return (
                     <tr key={asset.id} className="border-bottom">
@@ -393,7 +392,7 @@ export default function Assets() {
                       </td>
                       <td className="px-3 py-2">
                         {a.data_classification && (
-                          <Badge bg={dc.bg as any} className="fw-normal"
+                          <Badge bg={dc.bg} className="fw-normal"
                             style={dc.bg === 'light' ? { color: '#6c757d', border: '1px solid #dee2e6' } : {}}>
                             {dc.label}
                           </Badge>

@@ -3,3 +3,4 @@
 - [sandbox git restore + validation parity](sandbox-git-restore.md) — destructive git blocked; restore via `git show`; validation enforces feature/UI parity.
 - [GRC application-model conversion](grc-application-model.md) — threat-dashboard adopts the user's top-tab GRC shell; preserve every feature; install per-artifact with `pnpm --filter`.
 - [Wazuh integration migration safety](wazuh-migration-safety.md) — never return success+empty-data+error; don't swallow the core probe; fail-fast config; no creds in localStorage; frontend uses `/api`.
+- [TSX→JSX in-place conversion](tsx-to-jsx-conversion.md) — set `allowJs:true` so TS entry files resolve `.jsx`; Vite renders even if tsc is red; restart workflow + screenshot to verify.

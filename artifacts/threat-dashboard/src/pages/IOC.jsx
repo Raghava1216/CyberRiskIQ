@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Plus, Search, Download, Upload, Globe, Hash, Link2, Mail, File, HardDrive, Key, Target, CheckCircle } from 'react-feather';
 import { Card, Form, InputGroup, Table } from 'react-bootstrap';
 import { useIOCStore, iocStore } from '../lib/iocStore';
-import type { IOC } from '../lib/types';
 import AddIOCModal from '../components/AddIOCModal';
 import ImportIOCCSVModal from '../components/ImportIOCCSVModal';
 
@@ -10,7 +9,7 @@ const TYPES      = ['All', 'IP', 'Domain', 'URL', 'Hash', 'Email', 'File', 'Regi
 const SEVERITIES = ['All', 'Critical', 'High', 'Medium', 'Low'];
 const STATUSES   = ['All', 'Active', 'Inactive', 'Under Review', 'Whitelisted'];
 
-const typeIcon = (type: string) => {
+const typeIcon = (type) => {
   switch (type) {
     case 'IP':          return Globe;
     case 'Domain':      return Globe;
@@ -24,7 +23,7 @@ const typeIcon = (type: string) => {
   }
 };
 
-const typeStyle = (type: string) => {
+const typeStyle = (type) => {
   switch (type) {
     case 'IP':          return { bg: '#eff6ff', color: '#3B82EC', border: '#bfdbfe' };
     case 'Domain':      return { bg: '#ecfeff', color: '#0e7490', border: '#a5f3fc' };
@@ -38,7 +37,7 @@ const typeStyle = (type: string) => {
   }
 };
 
-const sevStyle = (s: string) => {
+const sevStyle = (s) => {
   if (s === 'Critical') return { bg: '#fff5f5', color: '#d9534f', border: '#fecaca' };
   if (s === 'High')     return { bg: '#fff7ed', color: '#fd7e14', border: '#fed7aa' };
   if (s === 'Medium')   return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
@@ -46,7 +45,7 @@ const sevStyle = (s: string) => {
   return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
 };
 
-const statusStyle = (s: string) => {
+const statusStyle = (s) => {
   if (s === 'Active')       return { bg: '#fff5f5', color: '#d9534f', border: '#fecaca' };
   if (s === 'Under Review') return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
   if (s === 'Inactive')     return { bg: '#f9fafb', color: '#98a2b3', border: '#e4e7ec' };
@@ -54,7 +53,7 @@ const statusStyle = (s: string) => {
   return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
 };
 
-function Chip({ text, style }: { text: string; style: { bg: string; color: string; border: string } }) {
+function Chip({ text, style }) {
   return (
     <span style={{ display: 'inline-block', fontSize: '0.72rem', padding: '2px 8px', borderRadius: 6, background: style.bg, color: style.color, border: `1px solid ${style.border}`, fontWeight: 500, whiteSpace: 'nowrap' }}>
       {text}
@@ -62,7 +61,7 @@ function Chip({ text, style }: { text: string; style: { bg: string; color: strin
   );
 }
 
-function ConfidenceBar({ value }: { value: number }) {
+function ConfidenceBar({ value }) {
   const color = value >= 80 ? '#4BBF73' : value >= 50 ? '#f0ad4e' : '#d9534f';
   return (
     <div className="d-flex align-items-center gap-2">
@@ -74,7 +73,7 @@ function ConfidenceBar({ value }: { value: number }) {
   );
 }
 
-function timeAgo(iso: string) {
+function timeAgo(iso) {
   const diff = Date.now() - new Date(iso).getTime();
   const h = Math.floor(diff / 3600000);
   if (h < 1)  return 'just now';
@@ -82,7 +81,7 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function exportToCSV(iocs: IOC[]) {
+function exportToCSV(iocs) {
   const headers = ['ID','Value','Type','Severity','Status','Confidence','Source','Threat Actor','Tags','First Seen','Last Seen'];
   const rows = iocs.map(i => [i.id, `"${i.value.replace(/"/g,'""')}"`, i.type, i.severity, i.status, i.confidence, `"${i.source}"`, `"${i.threat_actor}"`, `"${i.tags.join('; ')}"`, i.first_seen, i.last_seen]);
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -99,17 +98,17 @@ export default function IOCPage() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [addOpen,      setAddOpen]      = useState(false);
   const [importOpen,   setImportOpen]   = useState(false);
-  const [toast,        setToast]        = useState<string | null>(null);
+  const [toast,        setToast]        = useState(null);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
 
-  const handleAdd = (ioc: IOC) => {
+  const handleAdd = (ioc) => {
     const added = iocStore.add(ioc);
     setAddOpen(false);
     showToast(added > 0 ? `IOC "${ioc.value}" added` : `IOC "${ioc.value}" already exists`);
   };
 
-  const handleImport = (newIOCs: IOC[]) => {
+  const handleImport = (newIOCs) => {
     const added = iocStore.add(newIOCs);
     showToast(`${added} ${added === 1 ? 'IOC' : 'IOCs'} imported (${newIOCs.length - added} duplicates skipped)`);
   };
@@ -175,7 +174,7 @@ export default function IOCPage() {
 
       {/* IOC type distribution grid */}
       <div className="row g-2 mb-4">
-        {(['IP','Domain','URL','Hash','Email','File','Registry','Certificate'] as IOC['type'][]).map(t => {
+        {(['IP','Domain','URL','Hash','Email','File','Registry','Certificate']).map(t => {
           const count  = iocs.filter(i => i.type === t).length;
           const Icon   = typeIcon(t);
           const ts     = typeStyle(t);

@@ -1,15 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, XCircle, MinusCircle, RefreshCw, ChevronRight, Calendar, User, Clock, AlertTriangle, PlayCircle } from 'react-feather';
 import { Card, Row, Col, Badge } from 'react-bootstrap';
-import type { ComplianceFramework, ComplianceAssessment } from '../lib/complianceTypes';
-import type { RunAssessmentForm } from '../lib/complianceTypes';
 import {
   fetchFrameworks, fetchAssessments, fetchControls, createAssessment,
 } from '../lib/complianceData';
 import RunAssessmentModal from '../components/RunAssessmentModal';
 import AssessmentReviewPanel from '../components/AssessmentReviewPanel';
 
-function ScoreRing({ score, size = 72 }: { score: number; size?: number }) {
+function ScoreRing({ score, size = 72 }) {
   const r = (size / 2) - 7;
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
@@ -30,7 +28,7 @@ function ScoreRing({ score, size = 72 }: { score: number; size?: number }) {
   );
 }
 
-function ControlBar({ compliant, partial, noncompliant }: { compliant: number; partial: number; noncompliant: number }) {
+function ControlBar({ compliant, partial, noncompliant }) {
   const total = compliant + partial + noncompliant;
   if (total === 0) return <div style={{ height: 6, background: '#e9ecef', borderRadius: 999 }} />;
   return (
@@ -42,69 +40,69 @@ function ControlBar({ compliant, partial, noncompliant }: { compliant: number; p
   );
 }
 
-const categoryStyle = (cat: string) => {
+const categoryStyle = (cat) => {
   if (cat === 'Security') return { bg: '#eff6ff', color: '#3B82EC', border: '#bfdbfe' };
   if (cat === 'Privacy')  return { bg: '#f0fdf4', color: '#4BBF73', border: '#bbf7d0' };
   if (cat === 'Industry') return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
   return { bg: '#f9fafb', color: '#6c757d', border: '#e4e7ec' };
 };
 
-function fmtDate(iso: string | null) {
+function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function fmtTime(iso: string | null) {
+function fmtTime(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
     d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
-function statusChipStyle(s: string) {
+function statusChipStyle(s) {
   if (s === 'completed')   return { bg: '#f0fdf4', color: '#4BBF73', border: '#bbf7d0' };
   if (s === 'in_progress') return { bg: '#fffbeb', color: '#f0ad4e', border: '#fde68a' };
   return { bg: '#f9fafb', color: '#98a2b3', border: '#e4e7ec' };
 }
 
 export default function Compliance() {
-  const [frameworks, setFrameworks]     = useState<ComplianceFramework[]>([]);
+  const [frameworks, setFrameworks]     = useState([]);
   const [loadingFw,  setLoadingFw]      = useState(true);
-  const [fwError,    setFwError]        = useState<string | null>(null);
-  const [selectedFwId, setSelectedFwId] = useState<string | null>(null);
-  const [assessments,  setAssessments]  = useState<ComplianceAssessment[]>([]);
+  const [fwError,    setFwError]        = useState(null);
+  const [selectedFwId, setSelectedFwId] = useState(null);
+  const [assessments,  setAssessments]  = useState([]);
   const [loadingAss,   setLoadingAss]   = useState(false);
   const [runModalOpen, setRunModalOpen] = useState(false);
-  const [preselectedId, setPreselectedId] = useState<string | undefined>(undefined);
-  const [activeAssessment, setActiveAssessment] = useState<{ id: string; frameworkName: string; assessedBy: string } | null>(null);
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [preselectedId, setPreselectedId] = useState(undefined);
+  const [activeAssessment, setActiveAssessment] = useState(null);
+  const [toast, setToast] = useState(null);
 
-  const showToast = (msg: string, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 4000); };
+  const showToast = (msg, ok = true) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 4000); };
 
   const loadFrameworks = useCallback(async () => {
     setLoadingFw(true); setFwError(null);
     try { setFrameworks(await fetchFrameworks()); }
-    catch (e) { setFwError((e as Error).message); }
+    catch (e) { setFwError(e.message); }
     finally   { setLoadingFw(false); }
   }, []);
 
   useEffect(() => { loadFrameworks(); }, [loadFrameworks]);
 
-  const loadAssessments = useCallback(async (fwId: string) => {
+  const loadAssessments = useCallback(async (fwId) => {
     setLoadingAss(true);
     try { setAssessments(await fetchAssessments(fwId)); }
     catch { setAssessments([]); }
     finally { setLoadingAss(false); }
   }, []);
 
-  const handleFrameworkClick = (fw: ComplianceFramework) => {
+  const handleFrameworkClick = (fw) => {
     if (selectedFwId === fw.id) { setSelectedFwId(null); setAssessments([]); }
     else { setSelectedFwId(fw.id); loadAssessments(fw.id); }
   };
 
-  const handleRunAssessment = (preId?: string) => { setPreselectedId(preId); setRunModalOpen(true); };
+  const handleRunAssessment = (preId) => { setPreselectedId(preId); setRunModalOpen(true); };
 
-  const handleStartAssessment = async (form: RunAssessmentForm) => {
+  const handleStartAssessment = async (form) => {
     const controls = await fetchControls(form.framework_id);
     const assessmentId = await createAssessment(form, controls);
     const fw = frameworks.find(f => f.id === form.framework_id);
@@ -112,7 +110,7 @@ export default function Compliance() {
     setActiveAssessment({ id: assessmentId, frameworkName: fw?.name ?? 'Unknown', assessedBy: form.assessed_by });
   };
 
-  const handleAssessmentComplete = async (score: number) => {
+  const handleAssessmentComplete = async (score) => {
     setActiveAssessment(null);
     showToast(`Assessment completed! Overall score: ${score}%`);
     await loadFrameworks();
