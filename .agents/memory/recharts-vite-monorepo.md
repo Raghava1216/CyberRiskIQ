@@ -23,3 +23,17 @@ duplicate-React bug.**
 **How to apply:** if you see this only right after adding/optimizing deps,
 restart the workflow (forces a clean optimize) and re-check — a clean load and
 e2e tab navigation showed no errors. Don't chase it as a duplicate-React issue.
+
+## Blank charts inside react-bootstrap Tab.Container
+A recharts chart placed in a `Tab.Pane` can render blank (only legend, no
+arcs/bars) or show partial mid-animation artifacts. Console shows
+`width(-1)/height(0)` warnings from `ResponsiveContainer`.
+
+**Why:** the default Bootstrap tab fade transition mounts the active pane while
+it is still `display:none`/0-size, so `ResponsiveContainer` measures 0 and a
+`Pie` whose radius derives from that never recovers after resize.
+
+**How to apply:** set `transition={false}` on the `Tab.Container` (kills the
+fade so panes mount at real size) AND `isAnimationActive={false}` on every
+series (`Pie`/`Bar`/`Line`) for deterministic, screenshot-stable rendering. A
+`minHeight` wrapper around the container is a cheap extra guard.

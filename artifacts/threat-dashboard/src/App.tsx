@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Container, Tab } from 'react-bootstrap';
+import { Container, Tab, Row, Col } from 'react-bootstrap';
 import { useTranslation } from 'react-i18next';
 import {
   faGauge,
@@ -19,6 +19,8 @@ import TopBar from './components/TopBar';
 import LandingPagesTitle, { type LandingTab } from './components/pages/LandingPagesTitle';
 import DashboardCards, { type DashCard } from './components/pages/DashboardCards';
 import FormReportChartLink, { type LinkItem } from './components/pages/FormReportChartLink';
+import ChartCard from './components/platform/ChartCard';
+import ReportRuntime from './components/platform/ReportRuntime';
 
 import Dashboard from './pages/Dashboard';
 import Risks from './pages/Risks';
@@ -99,7 +101,7 @@ function AppInner() {
       <Helmet title={`CyberRisk IQ — ${activeTitle}`} />
       <TopBar />
 
-      <Tab.Container id="cr-menu" activeKey={activeTab} onSelect={handleSelect}>
+      <Tab.Container id="cr-menu" activeKey={activeTab} onSelect={handleSelect} transition={false}>
         <Container fluid className="pg-app-body">
           <LandingPagesTitle
             title={activeTitle}
@@ -112,6 +114,29 @@ function AppInner() {
             <Tab.Pane eventKey="dashboard" unmountOnExit>
               <DashboardCards cardDataArray={moduleCards} onAction={handleCardAction} />
               <FormReportChartLink combinedItems={quickLinks} onOpen={handleOpenLink} />
+
+              <div className="grc-section-title">{t('Risk & Control Overview')}</div>
+              <Row className="g-2 mb-2">
+                <Col lg={4} md={6}>
+                  <ChartCard chart="CR_CHT_RISK_SEVERITY" />
+                </Col>
+                <Col lg={4} md={6}>
+                  <ChartCard chart="CR_CHT_CONTROL_BU" />
+                </Col>
+                <Col lg={4} md={12}>
+                  <ChartCard chart="CR_CHT_LOSS_TREND" />
+                </Col>
+              </Row>
+
+              <Row className="g-2 mb-3">
+                <Col lg={7}>
+                  <ReportRuntime report="CR_RPT_TOP_RISKS" />
+                </Col>
+                <Col lg={5}>
+                  <ReportRuntime report="CR_RPT_CONTROL_TESTING" />
+                </Col>
+              </Row>
+
               <Dashboard onNavigate={setActiveTab} />
             </Tab.Pane>
             <Tab.Pane eventKey="risks" unmountOnExit>

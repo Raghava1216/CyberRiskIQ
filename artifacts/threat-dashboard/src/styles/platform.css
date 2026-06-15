@@ -61,3 +61,79 @@
 
 /* Sticky landing title sits below the 62px top bar */
 .sticky-top.cr-landing { top: 62px; }
+
+/* ── Report / Chart engine surfaces (application-template "Report Layout") ── */
+.grc-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pg-text-muted, #667085);
+  margin: 0.5rem 0 0.35rem;
+}
+
+.grc-chart-header {
+  border-bottom: 1px solid var(--pg-border, #e9ecef);
+  padding-bottom: 0.35rem;
+}
+.grc-chart-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--pg-text-primary, #101828);
+}
+.grc-chart-action {
+  color: var(--pg-text-muted, #98a2b3);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.grc-chart-action:hover { color: var(--cr-accent, #0E6E63); }
+
+/* Dense report data grid */
+.grc-table-wrap { max-height: 360px; overflow: auto; }
+.grc-table { font-size: 0.78rem; }
+.grc-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f4f6f8;
+  color: var(--pg-text-muted, #667085);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--pg-border, #e9ecef);
+  white-space: nowrap;
+}
+.grc-table tbody td { color: var(--pg-text-primary, #1d2939); }
+
+/* Risk-band score chip + treatment pill */
+.grc-band {
+  display: inline-block;
+  min-width: 28px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 0.72rem;
+  color: #1d2939;
+  text-align: center;
+}
+.grc-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.grc-tile {
+  width: 220px;
+  border: 1px solid var(--pg-border, #e9ecef);
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+/* FormReportChartLink links use the template green accent */
+.reportChart-cards .column h5 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--pg-text-primary, #101828);
+}
